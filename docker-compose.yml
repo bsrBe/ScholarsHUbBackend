@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    image: mernauth-backend
+    container_name: mernauth-backend-1
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    depends_on:
+      - mongo
+
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./.env:/app/.env
+
+  mongo:
+    image: mongo
+    container_name: mernauth-mongo-1
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
