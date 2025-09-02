@@ -5,12 +5,6 @@ const cookieParser = require("cookie-parser");
 
 router.use(cookieParser());
 
-
-
-//  @swagger
-
-
-
 const  {
     register,
     Login,

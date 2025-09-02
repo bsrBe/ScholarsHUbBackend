@@ -194,3 +194,96 @@ The User Forms API handles submissions from users.
 - **Success Response:**
   - **Code:** 200 OK
   - **Content:** `{ "_id": "...", "full_name": "...", ... }`
+
+---
+
+## Authentication API
+
+The Authentication API handles user registration, login, and other authentication-related actions.
+
+### Endpoints
+
+#### 1. Register a New User
+
+- **Endpoint:** `POST /auth/register`
+- **Access:** Public
+- **Description:** Creates a new user account.
+- **Request Body:**
+  ```json
+  {
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "password": "yourpassword",
+    "role": "user",
+    "profileImageUrl": "http://example.com/image.jpg"
+  }
+  ```
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "user": { ... }, "token": "..." }`
+  - **Note:** A cookie named `cookieToken` is also set in the response.
+
+#### 2. Login
+
+- **Endpoint:** `POST /auth/login`
+- **Access:** Public
+- **Description:** Authenticates a user and returns a JWT.
+- **Request Body:**
+  ```json
+  {
+    "email": "john.doe@example.com",
+    "password": "yourpassword"
+  }
+  ```
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "user": { ... }, "token": "..." }`
+  - **Note:** A cookie named `cookieToken` is also set in the response.
+
+#### 3. Get Current User
+
+- **Endpoint:** `GET /auth/me`
+- **Access:** Private
+- **Description:** Retrieves the profile of the currently authenticated user.
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "_id": "...", "name": "...", "email": "...", ... }`
+
+#### 4. Forgot Password
+
+- **Endpoint:** `POST /auth/forgotPassword`
+- **Access:** Private
+- **Description:** Sends a password reset link to the user's email.
+- **Request Body:**
+  ```json
+  {
+    "email": "john.doe@example.com"
+  }
+  ```
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "success": true, "msg": "Email sent successfully" }`
+
+#### 5. Reset Password
+
+- **Endpoint:** `PUT /auth/resetPassword/:token`
+- **Access:** Public
+- **Description:** Resets the user's password using the token from the reset email.
+- **Request Body:**
+  ```json
+  {
+    "password": "newpassword"
+  }
+  ```
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "user": { ... }, "token": "..." }`
+
+#### 6. Confirm Email
+
+- **Endpoint:** `GET /auth/confirmEmail/:token`
+- **Access:** Public
+- **Description:** Confirms the user's email address using the token from the confirmation email.
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "msg": "Email confirmed successfully. You can now log in." }`
