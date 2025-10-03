@@ -10,7 +10,6 @@ const userFormSchema = new mongoose.Schema({
 
   email: {
     type: String,
-    required: true,
     unique: true,
     match: [
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
@@ -67,7 +66,34 @@ const userFormSchema = new mongoose.Schema({
     type: String,
     required: false,
      trim: true
+  },
+  // New fields for status tracking and admin responses
+  status: {
+    type: String,
+    enum: ['pending', 'in_review', 'approved', 'rejected'],
+    default: 'pending'
+  },
+  admin_response: {
+    type: String,
+    required: false,
+    trim: true
+  },
+  reviewed_at: {
+    type: Date,
+    required: false
+  },
+  reviewed_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
+  },
+  // Add user reference for better tracking
+  user_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
   }
-});
+}, { timestamps: true });
+
 module.exports = mongoose.model("UserForm", userFormSchema);
 

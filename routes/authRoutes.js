@@ -11,7 +11,8 @@ const  {
     getMe,
     forgotPassword,
     resetPassword,
-    confirmEmail
+    confirmEmail,
+    logout
 } = require("../controllers/authController")
 
 router.get("/me" , protect ,getMe)
@@ -20,4 +21,6 @@ router.post("/login" , Login)
 router.post("/forgotPassword" ,protect,  forgotPassword)
 router.put("/resetPassword/:token", protect ,resetPassword)
 router.get("/confirmEmail/:token", confirmEmail);
+router.post("/logout", logout)
 module.exports = router
+

@@ -10,24 +10,16 @@ const {
   getFaqByCallbackKey,
 } = require("../controllers/faqController");
 
-const { protect, admin } = require("../middlewares/authMiddleware");
+const { protect, authorize } = require("../middlewares/authMiddleware");
 
-// Create FAQ
-router.post("/create",  createFaq);//protect, admin,
-
-// Get all FAQs
-router.get("/all", getAllFaqs);
-
-// Get FAQ by callback key
+// Public routes
+router.get("/", getAllFaqs);
+router.get("/:id", getFaqById);
 router.get("/callback/:callbackKey", getFaqByCallbackKey);
 
-// Update FAQ
-router.put("/update/:id", protect, admin, updateFaq);
-
-// Delete FAQ
-router.delete("/delete/:id", protect, admin, deleteFaq);
-
-// Get FAQ by ID
-router.get("/get/:id", getFaqById);
+// Admin routes (protected and admin only)
+router.post("/", protect, authorize("admin"), createFaq);
+router.put("/:id", protect, authorize("admin"), updateFaq);
+router.delete("/:id", protect, authorize("admin"), deleteFaq);
 
 module.exports = router;

@@ -1,15 +1,21 @@
 const cloudinary = require("../config/cloudinary");
 
-const uploadToCloudinary = (fileBuffer, filename) => {
+const uploadToCloudinary = (fileBuffer, filename, options = {}) => {
   return new Promise((resolve, reject) => {
+    // Determine if it's an image or document based on file extension
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(filename);
+    
+    const uploadOptions = {
+      folder: options.folder || (isImage ? "thumbnails" : "documents"),
+      public_id: filename.replace(/\.[^/.]+$/, ""), // strip extension
+      resource_type: isImage ? "image" : "raw",
+      use_filename: true,
+      unique_filename: false,
+      ...options
+    };
+
     const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: "documents",
-        public_id: filename.replace(/\.[^/.]+$/, ""), // strip extension to avoid .pdf.pdf
-        resource_type: "raw", // ensure PDFs and other files are handled correctly
-        use_filename: true,
-        unique_filename: false
-      },
+      uploadOptions,
       (error, result) => {
         if (error) return reject(error);
         resolve(result);

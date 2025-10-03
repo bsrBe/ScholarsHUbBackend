@@ -4,17 +4,38 @@ const sendEmail = require("../utils/sendEmail")
 const crypto = require("crypto"); 
 
 const register = async (req ,res , next) => {
-
     const {name , email , password ,  role , profileImageUrl} = req.body
     try {
-        const user =await  User.create({name , email , password,  role , profileImageUrl})
-       
-            sendTokenResponse(user , 200 , res)
-        
+        const user = await User.create({name , email , password,  role , profileImageUrl})
+
+        // Send confirmation email upon registration (do not auto-login)
+        try {
+            const confirmationToken = user.generateEmailConfirmationToken();
+            await user.save({ validateBeforeSave: false });
+
+            const confirmUrl = `${req.protocol}://${req.get("host")}/api/auth/confirmEmail/${confirmationToken}`;
+            const message = `Click the link to confirm your email: ${confirmUrl}`;
+
+            await sendEmail({
+                email: user.email,
+                subject: "Email Confirmation",
+                message
+            });
+        } catch (mailErr) {
+            // If email sending fails, keep account but report exact issue
+            return res.status(500).json({
+                message: "Registration succeeded, but failed to send confirmation email.",
+                emailError: mailErr?.message || "Unknown email error"
+            })
+        }
+
+        return res.status(200).json({
+            success: true,
+            msg: "Registration successful. Please check your email to confirm your account."
+        })
     } catch (error) {
         return res.status(500).json({message : error.message})
     }
-next()
 }
 
 const Login = async (req , res ,next) => {
@@ -35,20 +56,30 @@ const Login = async (req , res ,next) => {
         }
 
         if (!user.isEmailConfirmed) {
-            // Generate confirmation token
-            const confirmationToken = user.generateEmailConfirmationToken();
-            await user.save({ validateBeforeSave: false });
+            // In development, allow login without email confirmation to avoid SMTP blocking
+            if (process.env.NODE_ENV === "development") {
+                return sendTokenResponse(user, 200, res);
+            }
 
-            const confirmUrl = `${req.protocol}://${req.get("host")}/auth/confirm-email/${confirmationToken}`;
-            const message = `Click the link to confirm your email: <a href="${confirmUrl}">Verify Email</a>`;
+            try {
+                // Generate confirmation token and send email in non-dev envs
+                const confirmationToken = user.generateEmailConfirmationToken();
+                await user.save({ validateBeforeSave: false });
 
-            await sendEmail({
-                email: user.email,
-                subject: "Email Confirmation",
-                message
-            });
+                const confirmUrl = `${req.protocol}://${req.get("host")}/api/auth/confirmEmail/${confirmationToken}`;
+                const message = `Click the link to confirm your email: <a href="${confirmUrl}">Verify Email</a>`;
 
-            return res.status(403).json({ msg: "Please verify your email. Confirmation link sent." });
+                await sendEmail({
+                    email: user.email,
+                    subject: "Email Confirmation",
+                    message
+                });
+
+                return res.status(403).json({ msg: "Please verify your email. Confirmation link sent." });
+            } catch (e) {
+                console.error("Error sending confirmation email:", e.message);
+                return res.status(500).json({ msg: "Unable to send confirmation email. Check SMTP configuration." });
+            }
         }
 
         sendTokenResponse(user , 200 ,res)
@@ -66,17 +97,14 @@ const getMe = async (req ,res ,next) => {
 
 const sendTokenResponse = (user , statusCode , res) => {
     const token = user.getSignedJwtToken();
+    const days = Number(process.env.JWT_COOKIES_EXPIRE || 30);
+    const isDev = process.env.NODE_ENV === "development";
     const options = {
-        expires : new Date (
-            Date.now() +  process.env.JWT_COOKIES_EXPIRE * 24 * 60 * 60 * 1000
-        ),
+        expires : new Date (Date.now() +  days * 24 * 60 * 60 * 1000),
         httpOnly : true,
-        sameSite: "None",
-        secure: false,  // Enable CSRF protection by restricting cross-site cookies
+        sameSite: isDev ? "Lax" : "None",
+        secure: !isDev,
     }
-    if (process.env.NODE_ENV == "Production") {
-        options.secure = true;
-      }
 
       // Set the cookie and log it for debugging
     // res.cookie("cookieToken", token, options);
@@ -220,12 +248,14 @@ const confirmEmail = async (req, res) => {
     }
 };
 
-
-module.exports = {
-    register,
-    Login,
-    getMe,
-    forgotPassword,
-    resetPassword,
-    confirmEmail
-}
+const logout = async (req, res) => {
+    res
+      .clearCookie("cookieToken", {
+        httpOnly: true,
+        sameSite: process.env.NODE_ENV === "development" ? "Lax" : "None",
+        secure: process.env.NODE_ENV !== "development",
+      })
+      .status(200)
+      .json({ success: true, msg: "Logged out" });
+};
+module.exports = { register, Login, getMe, forgotPassword, resetPassword, confirmEmail, logout };

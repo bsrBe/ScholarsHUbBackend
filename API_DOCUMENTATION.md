@@ -23,7 +23,16 @@ The Articles API allows for the management of knowledge base articles.
   - **Code:** 200 OK
   - **Content:** `[{ "_id": "...", "title": "...", "content": "...", "category": "...", "createdAt": "...", "updatedAt": "..." }]`
 
-#### 2. Create a New Article
+#### 2. Get Article by ID
+
+- **Endpoint:** `GET /articles/:id`
+- **Access:** Public
+- **Description:** Retrieves a single article by its ID.
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "_id": "...", "title": "...", "content": "...", "category": "...", "createdAt": "...", "updatedAt": "..." }`
+
+#### 3. Create a New Article
 
 - **Endpoint:** `POST /articles`
 - **Access:** Private (Admin only)
@@ -38,15 +47,6 @@ The Articles API allows for the management of knowledge base articles.
   ```
 - **Success Response:**
   - **Code:** 201 Created
-  - **Content:** `{ "_id": "...", "title": "...", "content": "...", "category": "...", "createdAt": "...", "updatedAt": "..." }`
-
-#### 3. Get Article by ID
-
-- **Endpoint:** `GET /articles/:id`
-- **Access:** Public
-- **Description:** Retrieves a single article by its ID.
-- **Success Response:**
-  - **Code:** 200 OK
   - **Content:** `{ "_id": "...", "title": "...", "content": "...", "category": "...", "createdAt": "...", "updatedAt": "..." }`
 
 #### 4. Update an Article
@@ -92,7 +92,25 @@ The FAQs API is used to manage Frequently Asked Questions.
   - **Code:** 200 OK
   - **Content:** `[{ "_id": "...", "question": "...", "answer": "...", "callbackKey": "...", "createdAt": "...", "updatedAt": "..." }]`
 
-#### 2. Create a New FAQ
+#### 2. Get FAQ by ID
+
+- **Endpoint:** `GET /faqs/:id`
+- **Access:** Public
+- **Description:** Retrieves a single FAQ by its ID.
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "_id": "...", "question": "...", "answer": "...", "callbackKey": "...", "createdAt": "...", "updatedAt": "..." }`
+
+#### 3. Get FAQ by Callback Key
+
+- **Endpoint:** `GET /faqs/callback/:callbackKey`
+- **Access:** Public
+- **Description:** Retrieves a single FAQ by its `callbackKey`.
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "_id": "...", "question": "...", "answer": "...", "callbackKey": "...", "createdAt": "...", "updatedAt": "..." }`
+
+#### 4. Create a New FAQ
 
 - **Endpoint:** `POST /faqs`
 - **Access:** Private (Admin only)
@@ -106,24 +124,6 @@ The FAQs API is used to manage Frequently Asked Questions.
   ```
 - **Success Response:**
   - **Code:** 201 Created
-  - **Content:** `{ "_id": "...", "question": "...", "answer": "...", "callbackKey": "...", "createdAt": "...", "updatedAt": "..." }`
-
-#### 3. Get FAQ by ID
-
-- **Endpoint:** `GET /faqs/:id`
-- **Access:** Public
-- **Description:** Retrieves a single FAQ by its ID.
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:** `{ "_id": "...", "question": "...", "answer": "...", "callbackKey": "...", "createdAt": "...", "updatedAt": "..." }`
-
-#### 4. Get FAQ by Callback Key
-
-- **Endpoint:** `GET /faqs/callback/:callbackKey`
-- **Access:** Public
-- **Description:** Retrieves a single FAQ by its `callbackKey`.
-- **Success Response:**
-  - **Code:** 200 OK
   - **Content:** `{ "_id": "...", "question": "...", "answer": "...", "callbackKey": "...", "createdAt": "...", "updatedAt": "..." }`
 
 #### 5. Update an FAQ
@@ -177,23 +177,99 @@ The User Forms API handles submissions from users.
   - **Code:** 201 Created
   - **Content:** `{ "message": "Form submitted successfully", "data": { ... } }`
 
-#### 2. Get All Forms
+#### 2. Get User's Own Forms
 
-- **Endpoint:** `GET /forms/allForms`
-- **Access:** Private (Admin only - *Note: currently not protected*)
-- **Description:** Retrieves a list of all form submissions.
+- **Endpoint:** `GET /forms/my-forms`
+- **Access:** Private (User)
+- **Description:** Retrieves all form submissions by the authenticated user.
 - **Success Response:**
   - **Code:** 200 OK
-  - **Content:** `[{ "_id": "...", "full_name": "...", ... }]`
+  - **Content:** `[{ "_id": "...", "full_name": "...", "status": "...", "admin_response": "...", ... }]`
 
-#### 3. Get Form by ID
+#### 3. Get All Forms (Admin)
 
-- **Endpoint:** `GET /forms/forms/:id`
-- **Access:** Private (Admin only - *Note: currently not protected*)
+- **Endpoint:** `GET /forms`
+- **Access:** Private (Admin only)
+- **Description:** Retrieves a list of all form submissions with search and filtering capabilities.
+- **Query Parameters:**
+  - `search` (String, optional) - Search by name, email, or phone
+  - `status` (String, optional) - Filter by status (pending, in_review, approved, rejected)
+  - `country` (String, optional) - Filter by destination country
+  - `educationStatus` (String, optional) - Filter by educational status
+  - `page` (Number, optional) - Page number for pagination (default: 1)
+  - `limit` (Number, optional) - Number of items per page (default: 10)
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** 
+    ```json
+    {
+      "forms": [{ "_id": "...", "full_name": "...", ... }],
+      "pagination": {
+        "totalPages": 5,
+        "currentPage": 1,
+        "total": 50,
+        "hasNext": true,
+        "hasPrev": false
+      }
+    }
+    ```
+
+#### 4. Get Form by ID (Admin)
+
+- **Endpoint:** `GET /forms/:id`
+- **Access:** Private (Admin only)
 - **Description:** Retrieves a single form submission by its ID.
 - **Success Response:**
   - **Code:** 200 OK
   - **Content:** `{ "_id": "...", "full_name": "...", ... }`
+
+#### 5. Respond to Form (Admin)
+
+- **Endpoint:** `PUT /forms/:id/respond`
+- **Access:** Private (Admin only)
+- **Description:** Allows admin to respond to a form submission and update its status.
+- **Request Body:**
+  ```json
+  {
+    "response": "Thank you for your application. We have reviewed your documents and they look good.",
+    "status": "approved"
+  }
+  ```
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "message": "Form updated successfully and user notified", "data": { ... } }`
+
+#### 6. Download Document (Admin)
+
+- **Endpoint:** `GET /forms/:id/download`
+- **Access:** Private (Admin only)
+- **Description:** Downloads the document associated with a form submission.
+- **Success Response:**
+  - **Code:** 302 Redirect
+  - **Description:** Redirects to the document URL
+
+#### 7. Get Dashboard Statistics (Admin)
+
+- **Endpoint:** `GET /forms/dashboard-stats`
+- **Access:** Private (Admin only)
+- **Description:** Retrieves comprehensive dashboard statistics including form counts and analytics.
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:**
+    ```json
+    {
+      "overview": {
+        "totalForms": 150,
+        "pendingForms": 25,
+        "inReviewForms": 10,
+        "approvedForms": 100,
+        "rejectedForms": 15
+      },
+      "recentForms": [...],
+      "formsByCountry": [...],
+      "formsByEducation": [...]
+    }
+    ```
 
 ---
 
@@ -287,3 +363,35 @@ The Authentication API handles user registration, login, and other authenticatio
 - **Success Response:**
   - **Code:** 200 OK
   - **Content:** `{ "msg": "Email confirmed successfully. You can now log in." }`
+
+---
+
+## Form Status System
+
+The system now includes a comprehensive form status tracking system:
+
+### Status Types:
+- **pending**: Initial status when form is submitted
+- **in_review**: Form is being reviewed by admin
+- **approved**: Form has been approved
+- **rejected**: Form has been rejected
+
+### Admin Response System:
+- Admins can respond to form submissions with custom messages
+- Users receive email notifications when their form status changes
+- All responses are stored and visible in the user dashboard
+
+### User Dashboard Integration:
+- Users can view all their submitted forms
+- Users can see the current status of each form
+- Users can read admin responses
+- Real-time updates when admins respond to forms
+
+### Key Features:
+1. **Status Tracking**: Every form submission has a status that can be updated by admins
+2. **Admin Responses**: Admins can provide detailed responses to form submissions
+3. **Email Notifications**: Users automatically receive email notifications when their form status changes
+4. **User Dashboard**: Users can track their application progress in their personal dashboard
+5. **Search & Filtering**: Admins can search and filter forms by various criteria
+6. **Analytics**: Comprehensive dashboard statistics for admins
+7. **Document Management**: Secure document upload and download functionality
