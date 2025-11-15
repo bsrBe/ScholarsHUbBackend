@@ -24,6 +24,7 @@ const allowedOrigins = [
   "http://127.0.0.1:8080",
   'http://localhost:8081',  
  "https://nondeluded-decennially-zola.ngrok-free.dev", // frontend
+  "https://scholars-journey-builder.vercel.app",
   'http://192.168.1.192:8080',
   "http://127.0.0.1:5173",
   "https://meet.jit.si",
