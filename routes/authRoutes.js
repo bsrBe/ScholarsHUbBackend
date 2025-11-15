@@ -15,7 +15,8 @@ const  {
     logout
 } = require("../controllers/authController")
 
-router.get("/me" , protect ,getMe)
+// Remove protect middleware to allow token verification
+router.get("/me", getMe)
 router.post("/register" , register)
 router.post("/login" , Login)
 router.post("/forgotPassword" ,protect,  forgotPassword)

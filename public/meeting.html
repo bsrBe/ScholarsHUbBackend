@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Meeting</title>
+    <script src='https://meet.jit.si/external_api.js'></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        #meeting-container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        #waiting-message {
+            text-align: center;
+            padding: 40px 20px;
+            font-size: 18px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .meeting-info {
+            background: #e9f7fe;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Meeting Room</h1>
+        <div id="meeting-info" class="meeting-info">
+            <h3 id="meeting-title">Loading meeting information...</h3>
+            <p id="meeting-time"></p>
+        </div>
+        <div id="waiting-message"></div>
+        <div id="meeting-container"></div>
+    </div>
+
+    <script>
+        // Extract meeting ID and start time from the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const meetingId = urlParams.get('meetingId');
+        const startTime = urlParams.get('startTime');
+        const displayName = urlParams.get('displayName') || 'Guest';
+
+        // Update meeting info
+        document.getElementById('meeting-title').textContent = `Meeting ID: ${meetingId}`;
+        const meetingTime = new Date(startTime);
+        document.getElementById('meeting-time').textContent = `Scheduled for: ${meetingTime.toLocaleString()}`;
+
+        // Check if the meeting has started
+        function canJoinMeeting() {
+            const now = new Date();
+            const meetingStartTime = new Date(startTime);
+            return now >= meetingStartTime;
+        }
+
+        function initializeJitsi() {
+            const domain = 'meet.jit.si';
+            const options = {
+                roomName: meetingId,
+                width: '100%',
+                height: '100%',
+                parentNode: document.querySelector('#meeting-container'),
+                userInfo: {
+                    displayName: displayName,
+                    email: ''
+                },
+                configOverwrite: {
+                    prejoinPageEnabled: false,
+                    startWithAudioMuted: true,
+                    startWithVideoMuted: true,
+                    enableNoisyMicDetection: false,
+                    disableSimulcast: false,
+                    enableNoisyMicDetection: false,
+                    enableClosePage: false,
+                    disableRemoteMute: true,
+                    enableWelcomePage: false,
+                    requireDisplayName: true,
+                    startAudioOnly: false,
+                    startWithAudioMuted: false,
+                    startWithVideoMuted: false,
+                    disableModeratorIndicator: false,
+                    disableProfile: true,
+                    enableEmailInStats: false
+                },
+                interfaceConfigOverwrite: {
+                    APP_NAME: 'ScholarsHub Meeting',
+                    DEFAULT_BACKGROUND: '#ffffff',
+                    SHOW_JITSI_WATERMARK: true,
+                    SHOW_BRAND_WATERMARK: false,
+                    SHOW_POWERED_BY: false,
+                    TOOLBAR_BUTTONS: [
+                        'microphone', 'camera', 'closedcaption', 'desktop', 'fullscreen',
+                        'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
+                        'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
+                        'videoquality', 'filmstrip', 'invite', 'feedback', 'stats', 'tileview'
+                    ],
+                    SETTINGS_SECTIONS: ['devices', 'language', 'moderator', 'profile', 'calendar'],
+                    VIDEO_QUALITY_LABEL_DISABLED: false,
+                    MOBILE_APP_PROMO: false,
+                },
+            };
+
+            const api = new JitsiMeetExternalAPI(domain, options);
+
+            api.executeCommand('displayName', displayName);
+
+            api.addEventListeners({
+                readyToClose: () => {
+                    window.close();
+                },
+                participantLeft: function(participant) {
+                    console.log('Participant left:', participant);
+                },
+                videoConferenceJoined: function() {
+                    console.log('Local user joined the conference');
+                },
+                videoConferenceLeft: function() {
+                    console.log('Local user left the conference');
+                    window.close();
+                },
+                errorOccurred: function(error) {
+                    console.error('Jitsi API error:', error);
+                }
+            });
+        }
+
+        // Check if meeting can be joined
+        if (canJoinMeeting()) {
+            document.getElementById('waiting-message').style.display = 'none';
+            initializeJitsi();
+        } else {
+            document.getElementById('meeting-container').style.display = 'none';
+            const waitingMessage = document.getElementById('waiting-message');
+            waitingMessage.innerHTML = `
+                <h2>Your meeting hasn't started yet</h2>
+                <p>The meeting is scheduled for ${meetingTime.toLocaleString()}</p>
+                <p>Please wait until the scheduled time to join.</p>
+                <p>This page will automatically refresh to check if the meeting has started.</p>
+            `;
+            
+            // Check every minute if meeting can be joined
+            const checkInterval = setInterval(() => {
+                if (canJoinMeeting()) {
+                    clearInterval(checkInterval);
+                    window.location.reload();
+                }
+            }, 60000);
+        }
+    </script>
+</body>
+</html>

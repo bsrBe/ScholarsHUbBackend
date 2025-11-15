@@ -2,13 +2,25 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 
 const protect = async (req, res, next) => {
-  // Try to get the token from the cookies, specifically the "cookieToken" cookie
+  // Try to get the token from:
+  // 1. Authorization header (Bearer token)
+  // 2. Cookie (cookieToken)
+  let token;
+  
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    // Get token from header
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies.cookieToken) {
+    // Get token from cookie
+    token = req.cookies.cookieToken;
+  }
 
-  const token = req.cookies.cookieToken;
-
-  // If no token is found in the cookies
+  // If no token is found
   if (!token) {
-    return res.status(401).json({ message: "Not authorized, no token" });
+    return res.status(401).json({ 
+      success: false,
+      message: "Not authorized, no token provided" 
+    });
   }
 
   try {

@@ -8,27 +8,25 @@ const register = async (req ,res , next) => {
     try {
         const user = await User.create({name , email , password,  role , profileImageUrl})
 
-        // Send confirmation email upon registration (do not auto-login)
-        try {
-            const confirmationToken = user.generateEmailConfirmationToken();
-            await user.save({ validateBeforeSave: false });
+        // Generate confirmation token and save it
+        const confirmationToken = user.generateEmailConfirmationToken();
+        await user.save({ validateBeforeSave: false });
 
-            const confirmUrl = `${req.protocol}://${req.get("host")}/api/auth/confirmEmail/${confirmationToken}`;
-            const message = `Click the link to confirm your email: ${confirmUrl}`;
+        // Send confirmation email asynchronously (don't wait for it)
+        const confirmUrl = `${req.protocol}://${req.get("host")}/api/auth/confirmEmail/${confirmationToken}`;
+        const message = `Click the link to confirm your email: ${confirmUrl}`;
 
-            await sendEmail({
-                email: user.email,
-                subject: "Email Confirmation",
-                message
-            });
-        } catch (mailErr) {
-            // If email sending fails, keep account but report exact issue
-            return res.status(500).json({
-                message: "Registration succeeded, but failed to send confirmation email.",
-                emailError: mailErr?.message || "Unknown email error"
-            })
-        }
+        // Fire and forget - send email in background
+        sendEmail({
+            email: user.email,
+            subject: "Email Confirmation",
+            message
+        }).catch((mailErr) => {
+            // Log error but don't block the response
+            console.error("Error sending confirmation email (async):", mailErr?.message || mailErr);
+        });
 
+        // Return response immediately
         return res.status(200).json({
             success: true,
             msg: "Registration successful. Please check your email to confirm your account."
@@ -38,61 +36,175 @@ const register = async (req ,res , next) => {
     }
 }
 
-const Login = async (req , res ,next) => {
-    const {email , password} = req.body
+const Login = async (req, res, next) => {
+    const { email, password } = req.body;
+    console.log('Login attempt for email:', email);
 
     try {
-        const user = await User.findOne({email}).select("+password")
-        if(!email || !password) {
-            return res.status(400).json({msg : "please provide email and password"})
+        // Input validation
+        if (!email || !password) {
+            console.log('Missing credentials - email:', !!email, 'password:', !!password);
+            return res.status(400).json({ success: false, msg: "Please provide both email and password" });
         }
-        if (!user) {
-    return res.status(404).json({ msg: "invalid credentials, user not found" });
-}
 
+        console.log('Looking up user in database...');
+        const user = await User.findOne({ email }).select("+password");
+        
+        if (!user) {
+            console.log('User not found with email:', email);
+            return res.status(401).json({ success: false, msg: "Invalid credentials" });
+        }
+
+        console.log('User found, checking password...');
         const isMatch = await user.matchPassword(password);
-        if(!isMatch){
-            return res.status(404).json({msg : "invalid credentials"})
+        if (!isMatch) {
+            console.log('Invalid password for user:', email);
+            return res.status(401).json({ success: false, msg: "Invalid credentials" });
         }
 
         if (!user.isEmailConfirmed) {
-            // In development, allow login without email confirmation to avoid SMTP blocking
+            console.log('Email not confirmed for user:', email);
+            
+            // In development, allow login without email confirmation
             if (process.env.NODE_ENV === "development") {
-                return sendTokenResponse(user, 200, res);
-            }
-
-            try {
-                // Generate confirmation token and send email in non-dev envs
+                console.log('Development mode: Bypassing email confirmation');
+            } else {
+                // Generate confirmation token and save it
                 const confirmationToken = user.generateEmailConfirmationToken();
                 await user.save({ validateBeforeSave: false });
 
                 const confirmUrl = `${req.protocol}://${req.get("host")}/api/auth/confirmEmail/${confirmationToken}`;
                 const message = `Click the link to confirm your email: <a href="${confirmUrl}">Verify Email</a>`;
 
-                await sendEmail({
+                // Send email asynchronously (don't wait for it)
+                sendEmail({
                     email: user.email,
                     subject: "Email Confirmation",
                     message
+                }).catch((e) => {
+                    // Log error but don't block the response
+                    console.error("Error sending confirmation email (async):", e?.message || e);
                 });
 
-                return res.status(403).json({ msg: "Please verify your email. Confirmation link sent." });
-            } catch (e) {
-                console.error("Error sending confirmation email:", e.message);
-                return res.status(500).json({ msg: "Unable to send confirmation email. Check SMTP configuration." });
+                // Return response immediately
+                return res.status(403).json({ 
+                    success: false,
+                    msg: "Please verify your email. Confirmation link sent." 
+                });
             }
         }
 
-        sendTokenResponse(user , 200 ,res)
-
+        console.log('User authenticated successfully, generating token...');
+        
+        // If we get here, login is successful
+        const token = user.getSignedJwtToken();
+        
+        // Set cookie options
+        const options = {
+            expires: new Date(
+                Date.now() + (process.env.JWT_COOKIE_EXPIRE || 30) * 24 * 60 * 60 * 1000
+            ),
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        };
+        
+        // Remove password from output
+        user.password = undefined;
+        
+        // Prepare user data for response
+        const userData = {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            profileImageUrl: user.profileImageUrl,
+            isEmailConfirmed: user.isEmailConfirmed
+        };
+        
+        console.log('Login successful, sending response for user:', user.email);
+        console.log('Token generated:', token ? 'Yes' : 'No');
+        
+        // Send token in cookie and JSON response
+        const response = {
+            success: true,
+            token,
+            user: userData
+        };
+        
+        console.log('Sending login response:', JSON.stringify(response, null, 2));
+        
+        return res.status(200)
+            .cookie('token', token, options)
+            .json(response);
+            
     } catch (error) {
-        return res.status(500).json({msg : error.message} )
+        console.error('Login error:', error);
+        return res.status(500).json({ 
+            success: false, 
+            msg: 'Server error during login',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
+};
     
-}
 
-const getMe = async (req ,res ,next) => {
-    const user = await User.findById(req.user.id).select("-password")
-    res.status(200).json(user)
+
+const getMe = async (req, res, next) => {
+    try {
+        // Get token from header or cookie
+        let token;
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+            token = req.headers.authorization.split(' ')[1];
+        } else if (req.cookies && req.cookies.cookieToken) {
+            token = req.cookies.cookieToken;
+        }
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: 'Not authorized, no token provided'
+            });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // Get user from the token
+        const user = await User.findById(decoded.id).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                profileImageUrl: user.profileImageUrl,
+                isEmailConfirmed: user.isEmailConfirmed
+            }
+        });
+    } catch (error) {
+        console.error('Get me error:', error);
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({
+                success: false,
+                message: 'Not authorized, invalid token'
+            });
+        }
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
 }
 
 const sendTokenResponse = (user , statusCode , res) => {

@@ -26,9 +26,12 @@
     "nodemailer": "^6.10.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0",
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/jitsi-meet": "^2.0.5",
     "nodemon": "^3.1.9"
   }
 }
