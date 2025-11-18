@@ -6,7 +6,8 @@ const app = express();
 const swaggerUi = require("swagger-ui-express");
 const connectDB = require("./config/db");
 const YAML = require("yamljs");
-const userFormRoutes = require("./routes/userFormRoutes");
+const userFormRoutes = require('./routes/userFormRoutes');
+const partnersContactRoutes = require('./routes/partnersContactRoutes');
 const articleRoutes = require("./routes/articleRoutes");
 const faqRoutes = require("./routes/faqRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -14,17 +15,18 @@ const meetingRoutes = require("./routes/meetingRoutes");
 const jitsiRoutes = require("./routes/jitsiRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const taskApplicationRoutes = require("./routes/taskApplicationRoutes");
+const { setupHealthEndpoint, scheduleKeepAlive } = require('./cron-keep-alive');
 require("dotenv").config({ path: "./config/.env" });
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "http://localhost:4173",
-  "http://localhost:5000",
+  "http://localhost:4173", 
+  "http://localhost:3000",
   "http://localhost:8080",
   "http://127.0.0.1:8080",
   'http://localhost:8081',  
- "https://nondeluded-decennially-zola.ngrok-free.dev", // frontend
-  "https://scholars-journey-builder.vercel.app",
+ "https://nondeluded-decennially-zola.ngrok-free.dev",
+ "https://scholarshub1.vercel.app",
   'http://192.168.1.192:8080',
   "http://127.0.0.1:5173",
   "https://meet.jit.si",
@@ -79,6 +81,7 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/forms", userFormRoutes);
+app.use("/api/partners-contact", partnersContactRoutes);
 app.use("/api/articles", articleRoutes);
 app.use("/api/faqs", faqRoutes)
 app.use("/api/meetings", meetingRoutes);
@@ -91,8 +94,15 @@ app.use("/api/task-applications", taskApplicationRoutes);
 app.get('/', (req, res) => {
   res.send('Hello World');
 });
+
+// Setup health check endpoint for keep-alive
+setupHealthEndpoint(app);
+
 connectDB();
 
 app.listen(5000, '0.0.0.0', () => {
   console.log("server listenning on Port", process.env.PORT || 5000);
+  
+  // Start keep-alive cron job
+  scheduleKeepAlive();
 });
