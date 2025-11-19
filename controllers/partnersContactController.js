@@ -3,26 +3,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const PartnershipRequest = require('../models/partnershipRequest');
-const cloudinary = require('../config/cloudinary');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const { uploadToCloudinary } = require("../utils/cloudinary");
 
-// Configure cloudinary storage for multer
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'partner-documents',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'txt'],
-    public_id: (req, file) => {
-      const timestamp = Date.now();
-      const random = Math.round(Math.random() * 1E9);
-      const ext = path.extname(file.originalname).substring(1);
-      return `partner-${timestamp}-${random}.${ext}`;
-    }
-  }
-});
-
+// Configure multer for memory storage
 const upload = multer({ 
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
@@ -281,28 +266,54 @@ const submitIndividualInquiry = async (req, res) => {
     if (req.files) {
       if (req.files.passport && req.files.passport.length > 0) {
         const file = req.files.passport[0];
-        uploadedFiles.push({
-          type: 'Passport/ID Card',
-          filename: file.filename,
-          originalName: file.originalname,
-          url: file.path, // cloudinary returns URL in path
-          size: file.size,
-          mimetype: file.mimetype,
-          public_id: file.filename // for cloudinary management
-        });
+        const timestamp = Date.now();
+        const random = Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        const filename = `partner-${timestamp}-${random}`;
+        
+        try {
+          const result = await uploadToCloudinary(file.buffer, filename, {
+            folder: 'partner-documents'
+          });
+          
+          uploadedFiles.push({
+            type: 'Passport/ID Card',
+            filename: result.public_id,
+            originalName: file.originalname,
+            url: result.secure_url,
+            size: file.size,
+            mimetype: file.mimetype,
+            public_id: result.public_id
+          });
+        } catch (error) {
+          console.error('Error uploading passport:', error);
+        }
       }
       
       if (req.files.resume && req.files.resume.length > 0) {
         const file = req.files.resume[0];
-        uploadedFiles.push({
-          type: 'Resume/CV',
-          filename: file.filename,
-          originalName: file.originalname,
-          url: file.path, // cloudinary returns URL in path
-          size: file.size,
-          mimetype: file.mimetype,
-          public_id: file.filename // for cloudinary management
-        });
+        const timestamp = Date.now();
+        const random = Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        const filename = `partner-${timestamp}-${random}`;
+        
+        try {
+          const result = await uploadToCloudinary(file.buffer, filename, {
+            folder: 'partner-documents'
+          });
+          
+          uploadedFiles.push({
+            type: 'Resume/CV',
+            filename: result.public_id,
+            originalName: file.originalname,
+            url: result.secure_url,
+            size: file.size,
+            mimetype: file.mimetype,
+            public_id: result.public_id
+          });
+        } catch (error) {
+          console.error('Error uploading resume:', error);
+        }
       }
     }
     
@@ -393,28 +404,54 @@ const submitCompanyInquiry = async (req, res) => {
     if (req.files) {
       if (req.files.businessLicense && req.files.businessLicense.length > 0) {
         const file = req.files.businessLicense[0];
-        uploadedFiles.push({
-          type: 'Business License',
-          filename: file.filename,
-          originalName: file.originalname,
-          url: file.path, // cloudinary returns URL in path
-          size: file.size,
-          mimetype: file.mimetype,
-          public_id: file.filename // for cloudinary management
-        });
+        const timestamp = Date.now();
+        const random = Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        const filename = `partner-${timestamp}-${random}`;
+        
+        try {
+          const result = await uploadToCloudinary(file.buffer, filename, {
+            folder: 'partner-documents'
+          });
+          
+          uploadedFiles.push({
+            type: 'Business License',
+            filename: result.public_id,
+            originalName: file.originalname,
+            url: result.secure_url,
+            size: file.size,
+            mimetype: file.mimetype,
+            public_id: result.public_id
+          });
+        } catch (error) {
+          console.error('Error uploading business license:', error);
+        }
       }
       
       if (req.files.companyProfile && req.files.companyProfile.length > 0) {
         const file = req.files.companyProfile[0];
-        uploadedFiles.push({
-          type: 'Company Profile',
-          filename: file.filename,
-          originalName: file.originalname,
-          url: file.path, // cloudinary returns URL in path
-          size: file.size,
-          mimetype: file.mimetype,
-          public_id: file.filename // for cloudinary management
-        });
+        const timestamp = Date.now();
+        const random = Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        const filename = `partner-${timestamp}-${random}`;
+        
+        try {
+          const result = await uploadToCloudinary(file.buffer, filename, {
+            folder: 'partner-documents'
+          });
+          
+          uploadedFiles.push({
+            type: 'Company Profile',
+            filename: result.public_id,
+            originalName: file.originalname,
+            url: result.secure_url,
+            size: file.size,
+            mimetype: file.mimetype,
+            public_id: result.public_id
+          });
+        } catch (error) {
+          console.error('Error uploading company profile:', error);
+        }
       }
     }
     
@@ -522,44 +559,6 @@ const getAllPartnershipRequests = async (req, res) => {
   }
 };
 
-// Download uploaded file
-const downloadFile = async (req, res) => {
-  try {
-    const { filename } = req.params;
-    
-    // Find the file in database documents
-    const partnershipRequest = await PartnershipRequest.findOne({
-      'documents.filename': filename
-    });
-    
-    if (!partnershipRequest) {
-      return res.status(404).json({
-        success: false,
-        message: 'File not found in database'
-      });
-    }
-    
-    const document = partnershipRequest.documents.find(doc => doc.filename === filename);
-    
-    if (!document || !document.url) {
-      return res.status(404).json({
-        success: false,
-        message: 'File URL not found'
-      });
-    }
-    
-    // Redirect to cloudinary URL
-    res.redirect(document.url);
-    
-  } catch (error) {
-    console.error('Error downloading file:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to download file'
-    });
-  }
-};
-
 // Update partnership request status
 const updateRequestStatus = async (req, res) => {
   try {
@@ -639,12 +638,110 @@ const getPartnershipRequest = async (req, res) => {
   }
 };
 
+// Delete partnership request
+const deletePartnershipRequest = async (req, res) => {
+  try {
+    const request = await PartnershipRequest.findById(req.params.id);
+    
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Partnership request not found'
+      });
+    }
+
+    // Delete associated files from Cloudinary
+    if (request.documents && request.documents.length > 0) {
+      for (const doc of request.documents) {
+        try {
+          await cloudinary.uploader.destroy(doc.public_id);
+        } catch (error) {
+          console.error('Error deleting file from Cloudinary:', error);
+        }
+      }
+    }
+
+    await PartnershipRequest.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Partnership request deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting partnership request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while deleting the partnership request'
+    });
+  }
+};
+
+// Download file from Cloudinary
+const downloadFile = async (req, res) => {
+  try {
+    const { filename } = req.params;
+    
+    // Try to find by exact public_id match first (for full paths)
+    let request = await PartnershipRequest.findOne({
+      'documents.public_id': filename
+    });
+    
+    if (request) {
+      const document = request.documents.find(doc => doc.public_id === filename);
+      if (document) {
+        return res.redirect(document.url);
+      }
+    }
+    
+    // Try to find by filename match (for backward compatibility)
+    request = await PartnershipRequest.findOne({
+      'documents.filename': filename
+    });
+    
+    if (request) {
+      const document = request.documents.find(doc => doc.filename === filename);
+      if (document) {
+        return res.redirect(document.url);
+      }
+    }
+    
+    // If no exact match, try to find by partial match (extracted clean public_id)
+    const cleanPublicId = filename.includes('/') ? filename.split('/').pop()?.split('.')[0] : filename.split('.')[0];
+    
+    request = await PartnershipRequest.findOne({
+      'documents.public_id': { $regex: cleanPublicId }
+    });
+    
+    if (request) {
+      const document = request.documents.find(doc => 
+        doc.public_id && doc.public_id.includes(cleanPublicId)
+      );
+      if (document) {
+        return res.redirect(document.url);
+      }
+    }
+    
+    return res.status(404).json({
+      success: false,
+      message: 'File not found'
+    });
+    
+  } catch (error) {
+    console.error('Error downloading file:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while downloading the file'
+    });
+  }
+};
+
 module.exports = {
   submitIndividualInquiry,
   submitCompanyInquiry,
   getAllPartnershipRequests,
   getPartnershipRequest,
   updateRequestStatus,
+  deletePartnershipRequest,
   downloadFile,
   upload,
 };
