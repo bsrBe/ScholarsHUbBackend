@@ -3,6 +3,7 @@ const Meeting = require("../models/meetingsModel");
 const ActivityLog = require("../models/activityLog");
 const path = require('path');
 const fs = require('fs');
+const sendEmail = require("../utils/sendEmail");
 
 const ACTIVE_MEETING_STATUSES = ["scheduled", "in-progress"];
 const WORKING_HOURS = {
@@ -119,6 +120,63 @@ const createMeeting = async (req, res) => {
             entityId: String(meeting._id),
             metadata: { title, hostEmail }
         });
+
+        // Send meeting confirmation emails in background
+        const recipients = [hostEmail, ...participants.filter(p => p && p !== hostEmail)];
+        const meetingDate = start.toLocaleDateString('en-US', { 
+            weekday: 'long',
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        const meetingTime = start.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: timeZone 
+        });
+
+        recipients.forEach(email => {
+            if (email) {
+                const emailContent = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                            <h1 style="color: white; margin: 0;">📚 ScholarsHub</h1>
+                        </div>
+                        
+                        <div style="padding: 30px; background: white;">
+                            <h2 style="color: #2c3e50;">Meeting Scheduled</h2>
+                            <p>A consultation has been scheduled with you.</p>
+                            
+                            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                                <p style="margin: 0;"><strong>Title:</strong> ${title}</p>
+                                ${description ? `<p style="margin: 10px 0 0 0;"><strong>Description:</strong> ${description}</p>` : ''}
+                                <p style="margin: 10px 0 0 0;"><strong>Date:</strong> ${meetingDate}</p>
+                                <p style="margin: 10px 0 0 0;"><strong>Time:</strong> ${meetingTime}</p>
+                                <p style="margin: 10px 0 0 0;"><strong>Host:</strong> ${hostName}</p>
+                            </div>
+                            
+                            <div style="background: #e3f2fd; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+                                <p style="margin: 0; color: #1565c0;"><strong>⏰ Important:</strong> Please visit our website and log in to your account <strong>5 minutes before</strong> the scheduled time to join the meeting.</p>
+                            </div>
+                            
+                            <p>Best regards,<br>The ScholarsHub Team</p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 20px; text-align: center; border-radius: 0 0 8px 8px;">
+                            <p style="color: #6c757d; margin: 0; font-size: 12px;">© 2024 ScholarsHub. Making educational dreams come true.</p>
+                        </div>
+                    </div>
+                `;
+
+                sendEmail({
+                    email: email,
+                    subject: `Meeting Scheduled: ${title} - ScholarsHub`,
+                    html: emailContent,
+                    message: `A meeting "${title}" has been scheduled for ${meetingDate} at ${meetingTime}. Please visit our website 5 minutes before the meeting time.`
+                }).catch(err => console.error(`Failed to send meeting email to ${email}:`, err));
+            }
+        });
+
         res.status(201).json({ meeting, meetingLink: jitsiMeetingLink });
     } catch (error) {
         console.error("Error creating meeting:", error);
@@ -160,6 +218,66 @@ const updateMeeting = async (req, res) => {
             entityType: "Meeting",
             entityId: String(meeting._id),
             metadata: { title: meeting.title, status: meeting.status }
+        });
+
+        // Send update notification emails in background
+        const recipients = [meeting.hostEmail, ...(meeting.participants || []).filter(p => p && p !== meeting.hostEmail)];
+        const meetingDate = new Date(meeting.startTime).toLocaleDateString('en-US', { 
+            weekday: 'long',
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        const meetingTime = new Date(meeting.startTime).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: meeting.timeZone 
+        });
+
+        recipients.forEach(email => {
+            if (email) {
+                const emailContent = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                            <h1 style="color: white; margin: 0;">📚 ScholarsHub</h1>
+                        </div>
+                        
+                        <div style="padding: 30px; background: white;">
+                            <h2 style="color: #2c3e50;">Meeting Updated</h2>
+                            <p>A scheduled consultation has been updated.</p>
+                            
+                            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+                                <p style="margin: 0; color: #856404;"><strong>⚠️ Notice:</strong> The meeting details have been changed. Please review the updated information below.</p>
+                            </div>
+                            
+                            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                                <p style="margin: 0;"><strong>Title:</strong> ${meeting.title}</p>
+                                ${meeting.description ? `<p style="margin: 10px 0 0 0;"><strong>Description:</strong> ${meeting.description}</p>` : ''}
+                                <p style="margin: 10px 0 0 0;"><strong>Date:</strong> ${meetingDate}</p>
+                                <p style="margin: 10px 0 0 0;"><strong>Time:</strong> ${meetingTime}</p>
+                                <p style="margin: 10px 0 0 0;"><strong>Status:</strong> ${meeting.status}</p>
+                            </div>
+                            
+                            <div style="background: #e3f2fd; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+                                <p style="margin: 0; color: #1565c0;"><strong>⏰ Reminder:</strong> Please visit our website and log in to your account <strong>5 minutes before</strong> the scheduled time to join the meeting.</p>
+                            </div>
+                            
+                            <p>Best regards,<br>The ScholarsHub Team</p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 20px; text-align: center; border-radius: 0 0 8px 8px;">
+                            <p style="color: #6c757d; margin: 0; font-size: 12px;">© 2024 ScholarsHub. Making educational dreams come true.</p>
+                        </div>
+                    </div>
+                `;
+
+                sendEmail({
+                    email: email,
+                    subject: `Meeting Updated: ${meeting.title} - ScholarsHub`,
+                    html: emailContent,
+                    message: `The meeting "${meeting.title}" scheduled for ${meetingDate} at ${meetingTime} has been updated.`
+                }).catch(err => console.error(`Failed to send update email to ${email}:`, err));
+            }
         });
 
         res.json(meeting);
@@ -238,6 +356,62 @@ const deleteMeeting = async (req, res) => {
         // Only admin can delete; route already enforces admin, but keep guard
         const isAdmin = req.user && req.user.role === "admin";
         if (!isAdmin) return res.status(403).json({ error: "Admin access required" });
+
+        // Send cancellation emails before deleting
+        const recipients = [meeting.hostEmail, ...(meeting.participants || []).filter(p => p && p !== meeting.hostEmail)];
+        const meetingDate = new Date(meeting.startTime).toLocaleDateString('en-US', { 
+            weekday: 'long',
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        const meetingTime = new Date(meeting.startTime).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: meeting.timeZone 
+        });
+
+        recipients.forEach(email => {
+            if (email) {
+                const emailContent = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                            <h1 style="color: white; margin: 0;">📚 ScholarsHub</h1>
+                        </div>
+                        
+                        <div style="padding: 30px; background: white;">
+                            <h2 style="color: #2c3e50;">Meeting Cancelled</h2>
+                            <p>A scheduled consultation has been cancelled.</p>
+                            
+                            <div style="background: #fee; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0;">
+                                <p style="margin: 0; color: #991b1b;"><strong>❌ Cancelled:</strong> The meeting scheduled for ${meetingDate} at ${meetingTime} has been cancelled.</p>
+                            </div>
+                            
+                            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                                <p style="margin: 0;"><strong>Title:</strong> ${meeting.title}</p>
+                                ${meeting.description ? `<p style="margin: 10px 0 0 0;"><strong>Description:</strong> ${meeting.description}</p>` : ''}
+                                <p style="margin: 10px 0 0 0;"><strong>Was scheduled for:</strong> ${meetingDate} at ${meetingTime}</p>
+                            </div>
+                            
+                            <p>If you have any questions or would like to reschedule, please contact us through our website.</p>
+                            
+                            <p>Best regards,<br>The ScholarsHub Team</p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 20px; text-align: center; border-radius: 0 0 8px 8px;">
+                            <p style="color: #6c757d; margin: 0; font-size: 12px;">© 2024 ScholarsHub. Making educational dreams come true.</p>
+                        </div>
+                    </div>
+                `;
+
+                sendEmail({
+                    email: email,
+                    subject: `Meeting Cancelled: ${meeting.title} - ScholarsHub`,
+                    html: emailContent,
+                    message: `The meeting "${meeting.title}" scheduled for ${meetingDate} at ${meetingTime} has been cancelled.`
+                }).catch(err => console.error(`Failed to send cancellation email to ${email}:`, err));
+            }
+        });
 
         await meeting.deleteOne();
         await ActivityLog.create({

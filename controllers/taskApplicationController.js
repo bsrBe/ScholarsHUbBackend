@@ -1,6 +1,7 @@
 const TaskApplication = require("../models/taskApplication");
 const { uploadToCloudinary } = require("../utils/cloudinary");
 const ActivityLog = require("../models/activityLog");
+const sendEmail = require("../utils/sendEmail");
 
 // Create a new task application
 const createTaskApplication = async (req, res) => {
@@ -48,10 +49,8 @@ const createTaskApplication = async (req, res) => {
 
     const uploadedFiles = {};
 
-    // Upload required files
-    const requiredFields = ['passport', 'highschool_certificates', 'transcripts', 
-      'recommendation_letter_1', 'recommendation_letter_2', 'student_cv_resume', 
-      'statement_of_purpose', 'birth_certificate'];
+    // Upload required files (only passport, high school certificates, and transcripts are required)
+    const requiredFields = ['passport', 'highschool_certificates', 'transcripts'];
 
     for (const field of requiredFields) {
       if (!fileFields[field]) {
@@ -61,8 +60,10 @@ const createTaskApplication = async (req, res) => {
       uploadedFiles[field] = result.secure_url;
     }
 
-    // Upload optional files
-    const optionalFields = ['national_identity_card', 'english_proficiency'];
+    // Upload optional base files
+    const optionalFields = ['national_identity_card', 'english_proficiency', 
+      'recommendation_letter_1', 'recommendation_letter_2', 'student_cv_resume', 
+      'statement_of_purpose', 'birth_certificate'];
     for (const field of optionalFields) {
       if (fileFields[field]) {
         const result = await uploadToCloudinary(fileFields[field].buffer, fileFields[field].originalname);
@@ -72,13 +73,19 @@ const createTaskApplication = async (req, res) => {
 
     // Upload masters/phd specific files
     if (applicant_type === 'masters' || applicant_type === 'phd') {
-      const mastersRequired = ['recommendation_letter_3', 'bachelors_degree_certificate', 'bachelors_degree_transcript'];
+      const mastersRequired = ['bachelors_degree_certificate', 'bachelors_degree_transcript'];
       for (const field of mastersRequired) {
         if (!fileFields[field]) {
           return res.status(400).json({ error: `${field} is required for ${applicant_type} applicants` });
         }
         const result = await uploadToCloudinary(fileFields[field].buffer, fileFields[field].originalname);
         uploadedFiles[field] = result.secure_url;
+      }
+
+      // recommendation_letter_3 is now optional for masters/phd
+      if (fileFields.recommendation_letter_3) {
+        const result = await uploadToCloudinary(fileFields.recommendation_letter_3.buffer, fileFields.recommendation_letter_3.originalname);
+        uploadedFiles.recommendation_letter_3 = result.secure_url;
       }
 
       if (fileFields.diploma) {
@@ -113,6 +120,44 @@ const createTaskApplication = async (req, res) => {
       entityId: String(taskApplication._id),
       metadata: { applicant_type }
     });
+
+    // Send confirmation email in background
+    const user = await require("../models/userModel").findById(userId);
+    if (user && user.email) {
+      const emailContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0;">📚 ScholarsHub</h1>
+          </div>
+          
+          <div style="padding: 30px; background: white;">
+            <h2 style="color: #2c3e50;">Application Received!</h2>
+            <p>Dear ${user.name},</p>
+            <p>Thank you for submitting your ${applicant_type} application to ScholarsHub.</p>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Application Type:</strong> ${applicant_type.toUpperCase()}</p>
+              <p style="margin: 10px 0 0 0;"><strong>Status:</strong> Pending Review</p>
+            </div>
+            
+            <p>Our team will review your application and get back to you soon. You can check your application status anytime by logging into your account.</p>
+            
+            <p>Best regards,<br>The ScholarsHub Team</p>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 20px; text-align: center; border-radius: 0 0 8px 8px;">
+            <p style="color: #6c757d; margin: 0; font-size: 12px;">© 2024 ScholarsHub. Making educational dreams come true.</p>
+          </div>
+        </div>
+      `;
+
+      sendEmail({
+        email: user.email,
+        subject: "Application Received - ScholarsHub",
+        html: emailContent,
+        message: `Your ${applicant_type} application has been received and is pending review.`
+      }).catch(err => console.error("Failed to send confirmation email:", err));
+    }
 
     res.status(201).json({
       message: "Task application submitted successfully",
@@ -242,6 +287,67 @@ const respondToTaskApplication = async (req, res) => {
       entityId: String(id),
       metadata: { status, response }
     });
+
+    // Send status update email in background
+    if (application.user_id && application.user_id.email) {
+      const statusColors = {
+        'pending': '#f59e0b',
+        'in_review': '#3b82f6',
+        'approved': '#10b981',
+        'rejected': '#ef4444'
+      };
+
+      const statusIcons = {
+        'pending': '⏳',
+        'in_review': '🔍',
+        'approved': '✅',
+        'rejected': '❌'
+      };
+
+      const statusColor = statusColors[status] || '#6b7280';
+      const statusIcon = statusIcons[status] || '📋';
+      const statusText = status.replace('_', ' ').toUpperCase();
+
+      const emailContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0;">📚 ScholarsHub</h1>
+          </div>
+          
+          <div style="padding: 30px; background: white;">
+            <h2 style="color: #2c3e50;">Application Status Update</h2>
+            <p>Dear ${application.user_id.name},</p>
+            
+            <div style="background: ${statusColor}15; border: 2px solid ${statusColor}; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+              <div style="font-size: 32px; margin-bottom: 10px;">${statusIcon}</div>
+              <p style="font-size: 20px; font-weight: 600; color: ${statusColor}; margin: 0;">${statusText}</p>
+            </div>
+            
+            ${response ? `
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Message from our team:</strong></p>
+              <p style="margin: 10px 0 0 0; font-style: italic;">${response}</p>
+            </div>
+            ` : ''}
+            
+            <p>You can view your application details by logging into your account on our website.</p>
+            
+            <p>Best regards,<br>The ScholarsHub Team</p>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 20px; text-align: center; border-radius: 0 0 8px 8px;">
+            <p style="color: #6c757d; margin: 0; font-size: 12px;">© 2024 ScholarsHub. Making educational dreams come true.</p>
+          </div>
+        </div>
+      `;
+
+      sendEmail({
+        email: application.user_id.email,
+        subject: `${statusIcon} Application Status Update - ScholarsHub`,
+        html: emailContent,
+        message: `Your application status has been updated to: ${statusText}. ${response || ''}`
+      }).catch(err => console.error("Failed to send status update email:", err));
+    }
 
     res.json({
       message: "Application updated successfully",

@@ -89,6 +89,7 @@ app.use("/api/jitsi", jitsiRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/task-applications", taskApplicationRoutes);
+app.use("/api/contact", require("./routes/contactRoutes"));
 
 
 app.get('/', (req, res) => {
