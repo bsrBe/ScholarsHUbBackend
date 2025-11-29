@@ -32,6 +32,9 @@ const register = async (req ,res , next) => {
             msg: "Registration successful. Please check your email to confirm your account."
         })
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, msg: "Email already Registered" });
+        }
         return res.status(500).json({message : error.message})
     }
 }
@@ -351,12 +354,13 @@ const confirmEmail = async (req, res) => {
         user.confirmationToken = undefined;
         await user.save();
 
-      
-        res.status(200).json({ msg: "Email confirmed successfully. You can now log in." });
+        const frontendUrl = process.env.FRONTEND_URL;
+        return res.redirect(`${frontendUrl}/auth/confirm-email?status=success`);
 
     } catch (error) {
         console.error("Error verifying token:", error.message);
-        return res.status(400).json({ msg: "Invalid or expired token" });
+        const frontendUrl = process.env.FRONTEND_URL;
+        return res.redirect(`${frontendUrl}/auth/confirm-email?status=error&message=Invalid or expired token`);
     }
 };
 

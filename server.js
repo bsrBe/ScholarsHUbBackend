@@ -1,4 +1,5 @@
 const express = require("express");
+require("dotenv").config({ path: "./config/.env" });
 const authRoutes = require("./routes/authRoutes");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -16,7 +17,6 @@ const jitsiRoutes = require("./routes/jitsiRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const taskApplicationRoutes = require("./routes/taskApplicationRoutes");
 const { setupHealthEndpoint, scheduleKeepAlive } = require('./cron-keep-alive');
-require("dotenv").config({ path: "./config/.env" });
 
 const allowedOrigins = [
   "http://localhost:5173",
