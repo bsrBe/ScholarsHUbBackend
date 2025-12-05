@@ -18,6 +18,7 @@ const meetingRoutes = require("./routes/meetingRoutes");
 const jitsiRoutes = require("./routes/jitsiRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const taskApplicationRoutes = require("./routes/taskApplicationRoutes");
+const chatRoutes = require('./routes/chatRoutes');
 const { setupHealthEndpoint, scheduleKeepAlive } = require('./cron-keep-alive');
 
 const allowedOrigins = [
@@ -91,6 +92,7 @@ app.use("/api/jitsi", jitsiRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/task-applications", taskApplicationRoutes);
+app.use("/api/chat", chatRoutes);
 app.use("/api/contact", require("./routes/contactRoutes"));
 
 

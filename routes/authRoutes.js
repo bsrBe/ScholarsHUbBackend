@@ -12,16 +12,18 @@ const  {
     forgotPassword,
     resetPassword,
     confirmEmail,
-    logout
+    logout,
+    changePassword
 } = require("../controllers/authController")
 
 // Remove protect middleware to allow token verification
 router.get("/me", getMe)
 router.post("/register" , register)
 router.post("/login" , Login)
-router.post("/forgotPassword" ,protect,  forgotPassword)
+router.post("/forgotPassword" ,  forgotPassword)
 router.put("/resetPassword/:token", protect ,resetPassword)
 router.get("/confirmEmail/:token", confirmEmail);
 router.post("/logout", logout)
+router.put("/changePassword", protect, changePassword)
 module.exports = router
 

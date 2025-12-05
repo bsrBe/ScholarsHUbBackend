@@ -15,12 +15,35 @@ const register = async (req ,res , next) => {
         // Send confirmation email asynchronously (don't wait for it)
         const confirmUrl = `${req.protocol}://${req.get("host")}/api/auth/confirmEmail/${confirmationToken}`;
         const message = `Click the link to confirm your email: ${confirmUrl}`;
+        const html = `
+  <html>
+    <body style="font-family: Arial, sans-serif; background:#f5f5f5; padding:24px;">
+      <div style="max-width:480px; margin:0 auto; background:#ffffff; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+        <h2 style="margin-top:0; color:#111827;">Confirm your email</h2>
+        <p style="color:#4b5563; line-height:1.5;">
+          Thanks for signing up to ScholarsHub. Please click the button below to verify your email address.
+        </p>
+        <p style="text-align:center; margin:24px 0;">
+          <a href="${confirmUrl}"
+             style="display:inline-block; padding:12px 24px; background:#2563eb; color:#ffffff; text-decoration:none; border-radius:999px; font-weight:600;">
+            Confirm email
+          </a>
+        </p>
+        <p style="color:#6b7280; font-size:12px; line-height:1.5;">
+          If the button doesn't work, copy and paste this link into your browser:<br/>
+          <a href="${confirmUrl}" style="color:#2563eb; word-break:break-all;">${confirmUrl}</a>
+        </p>
+      </div>
+    </body>
+  </html>
+        `;
 
         // Fire and forget - send email in background
         sendEmail({
             email: user.email,
             subject: "Email Confirmation",
-            message
+            message,
+            html
         }).catch((mailErr) => {
             // Log error but don't block the response
             console.error("Error sending confirmation email (async):", mailErr?.message || mailErr);
@@ -77,13 +100,36 @@ const Login = async (req, res, next) => {
                 await user.save({ validateBeforeSave: false });
 
                 const confirmUrl = `${req.protocol}://${req.get("host")}/api/auth/confirmEmail/${confirmationToken}`;
-                const message = `Click the link to confirm your email: <a href="${confirmUrl}">Verify Email</a>`;
+                const message = `Click the link to confirm your email: ${confirmUrl}`;
+                const html = `
+  <html>
+    <body style="font-family: Arial, sans-serif; background:#f5f5f5; padding:24px;">
+      <div style="max-width:480px; margin:0 auto; background:#ffffff; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+        <h2 style="margin-top:0; color:#111827;">Confirm your email</h2>
+        <p style="color:#4b5563; line-height:1.5;">
+          Please click the button below to verify your email address.
+        </p>
+        <p style="text-align:center; margin:24px 0;">
+          <a href="${confirmUrl}"
+             style="display:inline-block; padding:12px 24px; background:#2563eb; color:#ffffff; text-decoration:none; border-radius:999px; font-weight:600;">
+            Confirm email
+          </a>
+        </p>
+        <p style="color:#6b7280; font-size:12px; line-height:1.5;">
+          If the button doesn't work, copy and paste this link into your browser:<br/>
+          <a href="${confirmUrl}" style="color:#2563eb; word-break:break-all;">${confirmUrl}</a>
+        </p>
+      </div>
+    </body>
+  </html>
+                `;
 
                 // Send email asynchronously (don't wait for it)
                 sendEmail({
                     email: user.email,
                     subject: "Email Confirmation",
-                    message
+                    message,
+                    html
                 }).catch((e) => {
                     // Log error but don't block the response
                     console.error("Error sending confirmation email (async):", e?.message || e);
@@ -374,4 +420,61 @@ const logout = async (req, res) => {
       .status(200)
       .json({ success: true, msg: "Logged out" });
 };
-module.exports = { register, Login, getMe, forgotPassword, resetPassword, confirmEmail, logout };
+
+const changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        // Validation
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ 
+                success: false, 
+                msg: "Please provide both current and new passwords" 
+            });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({ 
+                success: false, 
+                msg: "New password must be at least 8 characters long" 
+            });
+        }
+
+        // Get user from the authenticated request (from protect middleware)
+        const user = await User.findById(req.user.id).select("+password");
+
+        if (!user) {
+            return res.status(404).json({ 
+                success: false, 
+                msg: "User not found" 
+            });
+        }
+
+        // Verify current password
+        const isCurrentPasswordValid = await user.matchPassword(currentPassword);
+        if (!isCurrentPasswordValid) {
+            return res.status(400).json({ 
+                success: false, 
+                msg: "Current password is incorrect" 
+            });
+        }
+
+        // Update password
+        user.password = newPassword;
+        await user.save();
+
+        return res.status(200).json({ 
+            success: true, 
+            msg: "Password changed successfully" 
+        });
+
+    } catch (error) {
+        console.error("Change password error:", error);
+        return res.status(500).json({ 
+            success: false, 
+            msg: "Server error while changing password" 
+        });
+    }
+};
+
+module.exports = { register, Login, getMe, forgotPassword, resetPassword, confirmEmail, logout, changePassword };
