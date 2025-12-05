@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const encryptionUtil = require('../utils/encryption');
 
 const chatMessageSchema = new mongoose.Schema({
   from: {
@@ -9,7 +10,15 @@ const chatMessageSchema = new mongoose.Schema({
   message: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    set: function(value) {
+      // Encrypt message before saving
+      return encryptionUtil.encrypt(value);
+    },
+    get: function(value) {
+      // Decrypt message when retrieving
+      return encryptionUtil.decrypt(value);
+    }
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -25,7 +34,9 @@ const chatMessageSchema = new mongoose.Schema({
     default: null
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { getters: true }, // Ensure getters are used when converting to JSON
+  toObject: { getters: true }
 });
 
 // Index for efficient queries
