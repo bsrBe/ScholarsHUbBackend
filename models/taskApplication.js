@@ -30,23 +30,23 @@ const taskApplicationSchema = new mongoose.Schema({
   },
   recommendation_letter_1: {
     type: String, // Cloudinary URL
-    required: true
+    required: false
   },
   recommendation_letter_2: {
     type: String, // Cloudinary URL
-    required: true
+    required: false
   },
   student_cv_resume: {
     type: String, // Cloudinary URL
-    required: true
+    required: false
   },
   statement_of_purpose: {
     type: String, // Cloudinary URL
-    required: true
+    required: false
   },
   birth_certificate: {
     type: String, // Cloudinary URL
-    required: true
+    required: false
   },
   english_proficiency: {
     type: String, // Cloudinary URL
