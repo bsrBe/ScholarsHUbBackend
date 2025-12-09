@@ -278,88 +278,208 @@ const sendTokenResponse = (user , statusCode , res) => {
     .json({user , token})
 }
 
-const forgotPassword = async(req ,res) => {
-    const user = await User.findOne({email : req.body.email});
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                error: 'Please provide an email address'
+            });
+        }
 
-    if(!user) {
-        return res.status(400).json({msg : "user with this email not found"})
+        const user = await User.findOne({ email });
+
+        // Don't reveal if the email exists or not for security reasons
+        if (!user) {
+            console.log(`Password reset requested for non-existent email: ${email}`);
+            return res.status(200).json({
+                success: true,
+                message: 'If an account with this email exists, a password reset link has been sent.'
+            });
+        }
+
+        // Generate and save reset token
+        const resetToken = user.getResetPasswordToken();
+        await user.save({ validateBeforeSave: false });
+
+        // Create reset URL
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/reset-password?token=${resetToken}`;
+        
+        // Create email content
+        const message = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
+                <h2 style="color: #1a365d; margin-top: 0;">🔒 Password Reset Request</h2>
+                <p>Hello ${user.name || 'there'},</p>
+                <p>We received a request to reset the password for your ScholarHub account.</p>
+                <p>Please click the button below to set a new password:</p>
+                <div style="margin: 32px 0; text-align: center;">
+                    <a href="${resetUrl}" 
+                       style="display: inline-block; background-color: #3182ce; color: white; padding: 12px 24px; 
+                              text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                        Reset Password
+                    </a>
+                </div>
+                <p style="color: #718096; font-size: 14px; line-height: 1.5;">
+                    This link will expire in 30 minutes. If you didn't request this, please ignore this email or 
+                    contact support if you have any concerns.
+                </p>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+                <p style="font-size: 12px; color: #a0aec0; margin-bottom: 0;">
+                    If the button doesn't work, copy and paste this link into your browser:<br>
+                    <a href="${resetUrl}" style="color: #4299e1; word-break: break-all;">${resetUrl}</a>
+                </p>
+            </div>
+        `;
+
+        // Send email
+        await sendEmail({
+            email: user.email,
+            subject: '🔐 Password Reset Request - ScholarHub',
+            message: `Please use this link to reset your password: ${resetUrl}`,
+            html: message
+        });
+
+        console.log(`Password reset email sent to: ${user.email}`);
+        
+        return res.status(200).json({
+            success: true,
+            message: 'If an account with this email exists, a password reset link has been sent.'
+        });
+
+    } catch (error) {
+        console.error('Error in forgotPassword:', error);
+        
+        // Reset token if there was an error sending the email
+        if (user) {
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpire = undefined;
+            await user.save({ validateBeforeSave: false });
+        }
+        
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to process password reset request. Please try again.'
+        });
     }
-
-    const resetToken = user.getResetPasswordToken();
-    await user.save({validateBeforeSave : false});
-
-  const resetUrl = `${req.protocol}://${req.get(
-    "host"
-  )}/auth/resetPassword/${resetToken}`;
-  const message = `You are receiving this email because you(or someone else)has requested reset of a password please make a put request to ${resetUrl}`;
-
-
-try {
-    await sendEmail({
-        email : user.email,
-        subject : "password reset",
-        message
-
-    })
-    return res.status(200).json({ success: true, msg: "Email sent successfully" });
-
-} catch (error) {
-    console.error("Error during sendEmail:", error.message);
-    user.resetPasswordToken = undefined,
-    user.resetPasswordExpire = undefined
-    await user.save({validateBeforeSave : false})
-    
-    return res.status(500).json("email could not be sent" );
-}
 }
 
 const resetPassword = async (req, res) => {
-    // Extract reset token from URL params
-    let resetToken = req.params.token;
-    console.log("Received reset token:", resetToken);
-
-    if (!resetToken) {
-        return res.status(400).json({ msg: 'No reset token found in request' });
-    }
-    resetToken = resetToken.trim();  // Trim any leading/trailing spaces
-    if (resetToken.startsWith(":")) {
-        resetToken = resetToken.slice(1);
-    }
-    console.log("Trimmed token:", resetToken);
     try {
+        // Extract reset token and password from request body
+        const { token, password } = req.body;
+        
+        console.log("Reset password request received. Token:", token ? 'received' : 'missing');
+        
+        if (!token) {
+            console.error('No reset token provided in request body');
+            return res.status(400).json({ 
+                success: false,
+                error: 'No reset token provided' 
+            });
+        }
+
+        if (!password || typeof password !== 'string') {
+            console.error('Invalid password format');
+            return res.status(400).json({ 
+                success: false,
+                error: 'Please provide a valid password' 
+            });
+        }
+
+        if (password.length < 8) {
+            return res.status(400).json({
+                success: false,
+                error: 'Password must be at least 8 characters long'
+            });
+        }
+
         // Hash the reset token to match with the stored hash
         const hashedToken = crypto
             .createHash('sha256')
-            .update(resetToken)
+            .update(token.trim())
             .digest('hex');
 
-        // Find the user based on the reset password token and expiry time
+        console.log("Looking for user with hashed token:", hashedToken);
+
+        // Find the user based on the reset password token
         const user = await User.findOne({
             resetPasswordToken: hashedToken,
-            resetPasswordExpire: { $gt: Date.now() },
+            resetPasswordExpire: { $gt: Date.now() }
         });
 
         if (!user) {
-            return res.status(400).json({ error: 'Invalid token or token has expired' });
+            // Check if the token exists but is expired
+            const expiredUser = await User.findOne({
+                resetPasswordToken: hashedToken,
+                resetPasswordExpire: { $lte: Date.now() }
+            });
+            
+            if (expiredUser) {
+                console.error('Password reset token has expired');
+                return res.status(400).json({ 
+                    success: false,
+                    error: 'This password reset link has expired. Please request a new one.' 
+                });
+            }
+            
+            console.error('Invalid password reset token');
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid password reset link. Please request a new one.' 
+            });
         }
 
-        // Check if new password is valid
-        const newPassword = req.body.password;
-        if (!newPassword || typeof newPassword !== "string") {
-            return res.status(400).json({ msg: "Invalid password format" });
+        // Set and save the new password
+        try {
+            user.password = password;
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpire = undefined;
+            
+            await user.save();
+            
+            console.log('Password reset successful for user:', user.email);
+            
+            // Send confirmation email
+            try {
+                await sendEmail({
+                    email: user.email,
+                    subject: 'Password Changed Successfully',
+                    message: 'Your password has been successfully changed.',
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <h2>Password Changed Successfully</h2>
+                            <p>Your password has been successfully updated. If you did not make this change, please contact support immediately.</p>
+                            <p>If you initiated this change, you can ignore this email.</p>
+                        </div>
+                    `
+                });
+            } catch (emailError) {
+                console.error('Failed to send password change confirmation email:', emailError);
+                // Don't fail the request if email sending fails
+            }
+            
+            // Respond with success message
+            return res.status(200).json({
+                success: true,
+                message: 'Password reset successful. You can now log in with your new password.'
+            });
+            
+        } catch (saveError) {
+            console.error('Error saving new password:', saveError);
+            return res.status(500).json({
+                success: false,
+                error: 'Failed to update password. Please try again.'
+            });
         }
-
-        // Set new password
-        user.password = newPassword;
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpire = undefined;
-        await user.save();
-
-        // Respond with the updated user and token
-        sendTokenResponse(user, 200, res);
+        
     } catch (error) {
-        console.error(error);
-        return res.status(500).json({ msg: error.message });
+        console.error('Password reset error:', error);
+        return res.status(500).json({ 
+            success: false,
+            error: 'An error occurred while resetting your password. Please try again.' 
+        });
     }
 };
 

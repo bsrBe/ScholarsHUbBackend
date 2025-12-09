@@ -17,11 +17,12 @@ const  {
 } = require("../controllers/authController")
 
 // Remove protect middleware to allow token verification
-router.get("/me", getMe)
+router.get("/me", protect, getMe)
 router.post("/register" , register)
 router.post("/login" , Login)
 router.post("/forgotPassword" ,  forgotPassword)
-router.put("/resetPassword/:token", protect ,resetPassword)
+// Reset password route - token is now expected in the request body
+router.put("/resetPassword", resetPassword)
 router.get("/confirmEmail/:token", confirmEmail);
 router.post("/logout", logout)
 router.put("/changePassword", protect, changePassword)

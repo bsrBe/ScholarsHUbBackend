@@ -2,6 +2,11 @@ const User = require("../models/userModel");
 const Meeting = require("../models/meetingsModel");
 const UserForm = require("../models/userForm");
 const ActivityLog = require("../models/activityLog");
+const { 
+  forgotPassword: authForgotPassword, 
+  resetPassword: authResetPassword,
+  changePassword: authChangePassword
+} = require("./authController");
 
 const getStats = async (req, res) => {
   try {
@@ -75,6 +80,78 @@ const getOverview = async (req, res) => {
   }
 };
 
-module.exports = { getStats, getRecentActivities, getOverview };
+// @desc    Change admin password
+// @route   PUT /api/admin/change-password
+// @access  Private/Admin
+const changePassword = async (req, res, next) => {
+  // Forward to auth controller's changePassword
+  return authChangePassword(req, res, next);
+};
 
+// @desc    Forgot admin password
+// @route   POST /api/admin/forgot-password
+// @access  Public
+const forgotPassword = async (req, res, next) => {
+  // Store original send function
+  const originalSend = res.send;
+  
+  // Override res.send to intercept the response
+  res.send = function(body) {
+    // Only process if it's a successful response from auth controller
+    if (res.statusCode === 200 && body && typeof body === 'object' && body.success) {
+      // Check if user is admin before sending success response
+      User.findOne({ email: req.body.email, role: 'admin' })
+          .then(user => {
+            if (!user) {
+              console.log(`Password reset requested for non-admin email: ${req.body.email}`);
+              return originalSend.call(res, {
+                success: true,
+                message: 'If an admin account with this email exists, a password reset link has been sent.'
+              });
+            }
+            // If user is admin, send the original success response
+            originalSend.call(res, body);
+          })
+          .catch(err => {
+            console.error('Error checking admin status:', err);
+            originalSend.call(res, body); // Fallback to original response
+          });
+    } else {
+      // For non-200 or non-success responses, pass through
+      originalSend.call(res, body);
+    }
+  };
 
+  // Call the auth controller's forgotPassword
+  return authForgotPassword(req, res, next);
+};
+
+// @desc    Reset admin password
+// @route   PUT /api/admin/reset-password/:token
+// @access  Public
+const resetPassword = async (req, res, next) => {
+  // Store original send function
+  const originalSend = res.send;
+  
+  // Override res.send to intercept the response
+  res.send = function(body) {
+    // Only process if it's a successful response from auth controller
+    if (res.statusCode === 200 && body && typeof body === 'object' && body.success) {
+      // Update the success message to indicate admin password reset
+      body.message = body.message.replace('password', 'admin password');
+    }
+    originalSend.call(res, body);
+  };
+
+  // Call the auth controller's resetPassword
+  return authResetPassword(req, res, next);
+};
+
+module.exports = { 
+  getStats, 
+  getRecentActivities, 
+  getOverview,
+  changePassword,
+  forgotPassword,
+  resetPassword
+};

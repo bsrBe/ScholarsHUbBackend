@@ -2,6 +2,7 @@ const express = require("express");
 const dns = require("node:dns");
 dns.setDefaultResultOrder("ipv4first");
 require("dotenv").config({ path: "./config/.env" });
+const { errorHandler } = require("./utils/errorResponse");
 const authRoutes = require("./routes/authRoutes");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -95,19 +96,46 @@ app.use("/api/task-applications", taskApplicationRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/contact", require("./routes/contactRoutes"));
 
+// Error handler middleware (must be after all other middleware and routes)
+app.use(errorHandler);
 
 app.get('/', (req, res) => {
-  res.send('Hello World');
+  res.send('ScholarHub API is running');
 });
 
-// Setup health check endpoint for keep-alive
-setupHealthEndpoint(app);
-
-connectDB();
-
-app.listen(5000, '0.0.0.0', () => {
-  console.log("server listenning on Port", process.env.PORT || 5000);
-  
-  // Start keep-alive cron job
-  scheduleKeepAlive();
+// Handle 404 - Keep this as the last route
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Route not found'
+  });
 });
+
+const PORT = process.env.PORT || 5000;
+
+// Start server
+const startServer = async () => {
+  try {
+    await connectDB();
+    const server = app.listen(PORT, () => {
+      console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+      // Start the keep-alive scheduler after the server starts
+      scheduleKeepAlive();
+    });
+
+    // Handle unhandled promise rejections
+    process.on('unhandledRejection', (err, promise) => {
+      console.error(`Error: ${err.message}`);
+      // Close server & exit process
+      server.close(() => process.exit(1));
+    });
+
+    // Set up health check endpoint
+    setupHealthEndpoint(app);
+  } catch (error) {
+    console.error('Error starting server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
