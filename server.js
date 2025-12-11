@@ -18,20 +18,16 @@ const userRoutes = require("./routes/userRoutes");
 const meetingRoutes = require("./routes/meetingRoutes");
 const jitsiRoutes = require("./routes/jitsiRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const testimonialRoutes = require("./routes/testimonialRoutes");
 const taskApplicationRoutes = require("./routes/taskApplicationRoutes");
 const chatRoutes = require('./routes/chatRoutes');
 const { setupHealthEndpoint, scheduleKeepAlive } = require('./cron-keep-alive');
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "http://localhost:4173", 
-  "http://localhost:3000",
   "http://localhost:8080",
-  "http://127.0.0.1:8080",
-  'http://localhost:8081',  
- "https://nondeluded-decennially-zola.ngrok-free.dev",
+  "http://127.0.0.1:8080",  
  "https://scholarshub1.vercel.app",
-  'http://192.168.1.192:8080',
   "http://127.0.0.1:5173",
   "https://meet.jit.si",
   "https://*.jit.si",
@@ -92,6 +88,7 @@ app.use("/api/meetings", meetingRoutes);
 app.use("/api/jitsi", jitsiRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/testimonials", testimonialRoutes);
 app.use("/api/task-applications", taskApplicationRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/contact", require("./routes/contactRoutes"));
