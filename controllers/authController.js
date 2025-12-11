@@ -168,7 +168,8 @@ const Login = async (req, res, next) => {
             email: user.email,
             role: user.role,
             profileImageUrl: user.profileImageUrl,
-            isEmailConfirmed: user.isEmailConfirmed
+            isEmailConfirmed: user.isEmailConfirmed,
+            createdAt: user.createdAt
         };
         
         console.log('Login successful, sending response for user:', user.email);
@@ -237,7 +238,8 @@ const getMe = async (req, res, next) => {
                 email: user.email,
                 role: user.role,
                 profileImageUrl: user.profileImageUrl,
-                isEmailConfirmed: user.isEmailConfirmed
+                isEmailConfirmed: user.isEmailConfirmed,
+                createdAt: user.createdAt
             }
         });
     } catch (error) {
