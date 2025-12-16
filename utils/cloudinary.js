@@ -11,6 +11,7 @@ const uploadToCloudinary = (fileBuffer, filename, options = {}) => {
       resource_type: isImage ? "image" : "raw",
       use_filename: true,
       unique_filename: false,
+      transformation: isImage ? [{ quality: "auto", fetch_format: "auto" }] : undefined,
       ...options
     };
 

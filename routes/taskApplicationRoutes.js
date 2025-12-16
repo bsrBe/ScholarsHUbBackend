@@ -8,7 +8,8 @@ const {
   getTaskApplicationById,
   getAllTaskApplications,
   respondToTaskApplication,
-  addMessage
+  addMessage,
+  uploadAdditionalDocuments
 } = require("../controllers/taskApplicationController");
 
 // User routes
@@ -38,6 +39,16 @@ router.post(
 router.get("/my-applications", protect, getUserTaskApplications);
 router.get("/:id", protect, getTaskApplicationById);
 router.post("/:id/message", protect, addMessage);
+
+router.put(
+  "/:id/documents",
+  protect,
+  upload.fields([
+    { name: 'additional_documents_pdf', maxCount: 4 },
+    { name: 'additional_documents_images', maxCount: 4 }
+  ]),
+  uploadAdditionalDocuments
+);
 
 // Admin routes
 router.get("/", protect, admin, getAllTaskApplications);

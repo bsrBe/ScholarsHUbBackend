@@ -414,12 +414,83 @@ const addMessage = async (req, res) => {
   }
 };
 
+// Upload additional documents
+const uploadAdditionalDocuments = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const application = await TaskApplication.findById(id);
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    // Check ownership
+    if (String(application.user_id) !== String(userId)) {
+      return res.status(403).json({ error: "Not authorized" });
+    }
+
+    const pdfFiles = req.files?.additional_documents_pdf || [];
+    const imageFiles = req.files?.additional_documents_images || [];
+
+    const pdfUrls = [];
+    const imageUrls = [];
+
+    // Upload PDFs
+    for (const file of pdfFiles) {
+      const result = await uploadToCloudinary(file.buffer, file.originalname, { folder: 'documents' });
+      pdfUrls.push(result.secure_url);
+    }
+
+    // Upload Images
+    for (const file of imageFiles) {
+      const result = await uploadToCloudinary(file.buffer, file.originalname, { folder: 'documents' });
+      imageUrls.push(result.secure_url);
+    }
+
+    // Update application
+    if (pdfUrls.length > 0) {
+      application.additional_documents_pdf.push(...pdfUrls);
+    }
+    if (imageUrls.length > 0) {
+      application.additional_documents_images.push(...imageUrls);
+    }
+
+    await application.save();
+
+    await ActivityLog.create({
+      actor: userId,
+      action: "TASK_APPLICATION_UPDATE_DOCS",
+      entityType: "TaskApplication",
+      entityId: String(id),
+      metadata: { 
+        pdf_count: pdfUrls.length,
+        image_count: imageUrls.length
+      }
+    });
+
+    res.json({
+      message: "Additional documents uploaded successfully",
+      data: application
+    });
+
+  } catch (error) {
+    console.error("Error uploading additional documents:", error);
+    res.status(500).json({ error: "Failed to upload documents" });
+  }
+};
+
 module.exports = {
   createTaskApplication,
   getUserTaskApplications,
   getTaskApplicationById,
   getAllTaskApplications,
   respondToTaskApplication,
-  addMessage
+  addMessage,
+  uploadAdditionalDocuments
 };
 

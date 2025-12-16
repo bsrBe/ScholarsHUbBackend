@@ -85,6 +85,9 @@ exports.updateTestimonial = async (req, res) => {
         url: result.secure_url,
         public_id: result.public_id
       };
+    } else if (req.body.removeImage === 'true') {
+      // Remove image if requested
+      updateData.image = null;
     }
 
     const updatedTestimonial = await Testimonial.findByIdAndUpdate(

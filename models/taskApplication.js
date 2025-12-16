@@ -74,6 +74,13 @@ const taskApplicationSchema = new mongoose.Schema({
     type: String, // Cloudinary URL
     required: false
   },
+  // Additional optional documents
+  additional_documents_pdf: [{
+    type: String // Cloudinary URLs
+  }],
+  additional_documents_images: [{
+    type: String // Cloudinary URLs
+  }],
   // Status and admin response
   status: {
     type: String,
