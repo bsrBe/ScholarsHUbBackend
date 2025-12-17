@@ -24,11 +24,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const { setupHealthEndpoint, scheduleKeepAlive } = require('./cron-keep-alive');
 
 const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:8080",
-  "http://127.0.0.1:8080",  
- "https://scholarshub1.vercel.app",
-  "http://127.0.0.1:5173",
+ "https://scholarshubglobal.com",
   "https://meet.jit.si",
   "https://*.jit.si",
 ];
