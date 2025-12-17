@@ -141,215 +141,156 @@ const respondToForm = async (req, res) => {
       return res.status(404).json({ message: "Form not found" });
     }
     
-    // Update form with admin response
+    const adminId = req.user._id;
+
+    // Process uploaded documents if any
+    let admin_response_documents = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        try {
+          const result = await uploadToCloudinary(file.buffer, file.originalname);
+          admin_response_documents.push(result.secure_url);
+        } catch (uploadError) {
+          console.error("Error uploading admin document:", uploadError);
+        }
+      }
+    }
+
     const updatedForm = await UserForm.findByIdAndUpdate(
       req.params.id,
       {
+        status,
         admin_response: response,
-        status: status,
+        isRead: false,
         reviewed_at: new Date(),
-        reviewed_by: req.user.id
+        reviewed_by: adminId,
+        $push: { admin_response_documents: { $each: admin_response_documents } }
       },
       { new: true }
-    ).populate('reviewed_by', 'name email');
+    ).populate('user_id', 'name email');
+
+    if (!updatedForm) {
+      return res.status(404).json({ message: "Form not found" });
+    }
     
-    // Send email notification to user
-    try {
-      const statusColors = {
-        'pending': '#f59e0b',
-        'in_review': '#3b82f6', 
-        'approved': '#10b981',
-        'rejected': '#ef4444'
-      };
+    // Send status update email
+    if (updatedForm.email) {
 
-      const statusIcons = {
-        'pending': '⏳',
-        'in_review': '🔍',
-        'approved': '✅',
-        'rejected': '❌'
-      };
+      try {
+        const statusColors = {
+          'pending': '#f59e0b',
+          'in_review': '#3b82f6', 
+          'approved': '#10b981',
+          'rejected': '#ef4444'
+        };
 
-      const statusColor = statusColors[status] || '#6b7280';
-      const statusIcon = statusIcons[status] || '📋';
-      const statusText = status.replace('_', ' ').toUpperCase();
+        const statusIcons = {
+          'pending': '⏳',
+          'in_review': '🔍',
+          'approved': '✅',
+          'rejected': '❌'
+        };
 
-      const message = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Application Status Update</title>
-            <style>
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    max-width: 600px;
-                    margin: 0 auto;
-                    background-color: #f8fafc;
-                    padding: 20px;
-                }
-                .email-container {
-                    background: white;
-                    border-radius: 12px;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                    overflow: hidden;
-                }
-                .header {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 30px;
-                    text-align: center;
-                }
-                .header h1 {
-                    margin: 0;
-                    font-size: 28px;
-                    font-weight: 600;
-                }
-                .header p {
-                    margin: 10px 0 0 0;
-                    opacity: 0.9;
-                    font-size: 16px;
-                }
-                .content {
-                    padding: 40px 30px;
-                }
-                .greeting {
-                    font-size: 18px;
-                    margin-bottom: 25px;
-                    color: #374151;
-                }
-                .status-card {
-                    background: ${statusColor}15;
-                    border: 2px solid ${statusColor};
-                    border-radius: 8px;
-                    padding: 20px;
-                    margin: 25px 0;
-                    text-align: center;
-                }
-                .status-icon {
-                    font-size: 32px;
-                    margin-bottom: 10px;
-                }
-                .status-text {
-                    font-size: 20px;
-                    font-weight: 600;
-                    color: ${statusColor};
-                    margin: 0;
-                }
-                .response-section {
-                    margin: 30px 0;
-                }
-                .response-title {
-                    font-size: 16px;
-                    font-weight: 600;
-                    color: #374151;
-                    margin-bottom: 10px;
-                    display: flex;
-                    align-items: center;
-                }
-                .response-content {
-                    background: #f9fafb;
-                    border-left: 4px solid #667eea;
-                    padding: 15px 20px;
-                    border-radius: 0 8px 8px 0;
-                    font-style: italic;
-                    color: #4b5563;
-                }
-                .footer {
-                    background: #f8fafc;
-                    padding: 25px 30px;
-                    text-align: center;
-                    border-top: 1px solid #e5e7eb;
-                }
-                .footer p {
-                    margin: 5px 0;
-                    color: #6b7280;
-                }
-                .logo {
-                    font-weight: 700;
-                    color: #667eea;
-                }
-                .divider {
-                    height: 2px;
-                    background: linear-gradient(90deg, transparent, #667eea, transparent);
-                    margin: 25px 0;
-                    border: none;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="email-container">
-                <div class="header">
-                    <h1>📚 ScholarHub</h1>
-                    <p>Your Educational Journey Partner</p>
-                </div>
-                
-                <div class="content">
-                    <div class="greeting">
-                        Hello <strong>${form.full_name}</strong>,
-                    </div>
-                    
-                    <p>We hope this email finds you well. We wanted to update you on the status of your application submitted on ${new Date(form.createdAt).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}.</p>
-                    
-                    <div class="status-card">
-                        <div class="status-icon">${statusIcon}</div>
-                        <p class="status-text">${statusText}</p>
-                    </div>
-                    
-                    <hr class="divider">
-                    
-                    <div class="response-section">
-                        <div class="response-title">
-                            💬 Message from our team:
-                        </div>
-                        <div class="response-content">
-                            ${response}
-                        </div>
-                    </div>
-                    
-                    <hr class="divider">
-                    
-                    <p>If you have any questions or need further assistance, please don't hesitate to reach out to our support team. We're here to help you every step of the way.</p>
-                    
-                    <p><strong>Next Steps:</strong></p>
-                    <ul style="color: #4b5563; padding-left: 20px;">
-                        ${status === 'approved' ? 
-                          '<li>Check your email for further instructions</li><li>Prepare required documents as advised</li><li>Stay in touch with your assigned counselor</li>' :
-                          status === 'in_review' ?
-                          '<li>We are currently reviewing your application</li><li>You may be contacted for additional information</li><li>Please keep your documents ready</li>' :
-                          status === 'rejected' ?
-                          '<li>Review the feedback provided above</li><li>Consider reapplying with improvements</li><li>Contact us for guidance on next steps</li>' :
-                          '<li>Your application is in queue for review</li><li>We will update you as soon as possible</li><li>Ensure your contact information is up to date</li>'
-                        }
-                    </ul>
-                </div>
-                
-                <div class="footer">
-                    <p><strong class="logo">ScholarHub Team</strong></p>
-                    <p>Making your educational dreams come true</p>
-                    <p style="font-size: 12px; margin-top: 15px;">
-                        This is an automated message. Please do not reply to this email.
-                    </p>
-                </div>
-            </div>
-        </body>
-        </html>
-      `;
-      
-      await sendEmail({
-        email: form.email,
-        subject: `${statusIcon} Application Status Update - ScholarHub`,
-        html: message
-      });
-    } catch (emailError) {
-      console.error("Email sending failed:", emailError);
-      // Don't fail the request if email fails
+        const statusColor = statusColors[status] || '#6b7280';
+        const statusIcon = statusIcons[status] || '📋';
+        const statusText = status.replace('_', ' ').toUpperCase();
+
+        const message = `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <style>
+                  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+                  .email-container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                  .header { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 30px 20px; text-align: center; }
+                  .header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 1px; }
+                  .header p { margin: 5px 0 0; opacity: 0.9; font-size: 14px; }
+                  .content { padding: 40px 30px; }
+                  .status-card { background-color: ${statusColor}15; border-left: 5px solid ${statusColor}; padding: 20px; border-radius: 0 8px 8px 0; margin: 25px 0; display: flex; align-items: center; }
+                  .status-icon { font-size: 32px; margin-right: 15px; }
+                  .status-text { color: ${statusColor}; font-weight: 700; font-size: 18px; margin: 0; }
+                  .response-section { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-top: 25px; }
+                  .response-title { font-weight: 600; color: #1e293b; margin-bottom: 10px; display: flex; align-items: center; }
+                  .response-content { color: #475569; font-style: italic; white-space: pre-wrap; }
+                  .footer { background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 13px; }
+                  .logo { color: #1e3a8a; font-weight: 700; }
+                  .divider { border: 0; height: 1px; background: #e2e8f0; margin: 25px 0; }
+                  .greeting { font-size: 16px; margin-bottom: 20px; color: #1e293b; }
+              </style>
+          </head>
+          <body>
+              <div class="email-container">
+                  <div class="header">
+                      <h1>📚 ScholarHub</h1>
+                      <p>Your Educational Journey Partner</p>
+                  </div>
+                  
+                  <div class="content">
+                      <div class="greeting">
+                          Hello <strong>${updatedForm.full_name}</strong>,
+                      </div>
+                      
+                      <p>We hope this email finds you well. We wanted to update you on the status of your application submitted on ${new Date(updatedForm.createdAt).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}.</p>
+                      
+                      <div class="status-card">
+                          <div class="status-icon">${statusIcon}</div>
+                          <p class="status-text">${statusText}</p>
+                      </div>
+                      
+                      <hr class="divider">
+                      
+                      <div class="response-section">
+                          <div class="response-title">
+                              💬 Message from our team:
+                          </div>
+                          <div class="response-content">
+                              ${response}
+                          </div>
+                      </div>
+                      
+                      <hr class="divider">
+                      
+                      <p>If you have any questions or need further assistance, please don't hesitate to reach out to our support team. We're here to help you every step of the way.</p>
+                      
+                      <p><strong>Next Steps:</strong></p>
+                      <ul style="color: #4b5563; padding-left: 20px;">
+                          ${status === 'approved' ? 
+                            '<li>Check your email for further instructions</li><li>Prepare required documents as advised</li><li>Stay in touch with your assigned counselor</li>' :
+                            status === 'in_review' ?
+                            '<li>We are currently reviewing your application</li><li>You may be contacted for additional information</li><li>Please keep your documents ready</li>' :
+                            status === 'rejected' ?
+                            '<li>Review the feedback provided above</li><li>Consider reapplying with improvements</li><li>Contact us for guidance on next steps</li>' :
+                            '<li>Your application is in queue for review</li><li>We will update you as soon as possible</li><li>Ensure your contact information is up to date</li>'
+                          }
+                      </ul>
+                  </div>
+                  
+                  <div class="footer">
+                      <p><strong class="logo">ScholarHub Team</strong></p>
+                      <p>Making your educational dreams come true</p>
+                      <p style="font-size: 12px; margin-top: 15px;">
+                          This is an automated message. Please do not reply to this email.
+                      </p>
+                  </div>
+              </div>
+          </body>
+          </html>
+        `;
+        
+        await sendEmail({
+          email: updatedForm.email,
+          subject: `${statusIcon} Application Status Update - ScholarHub`,
+          html: message
+        });
+      } catch (emailError) {
+        console.error("Email sending failed:", emailError);
+        // Don't fail the request if email fails
+      }
     }
     
     res.status(200).json({
@@ -433,6 +374,30 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
+
+const markAsRead = async (req, res) => {
+    try {
+      const userId = req.user?._id;
+      // Mark forms where user_id matches OR email matches (since forms support email-based lookup sometimes, but usually user_id is safer if consistent)
+      // The getUserForms controller uses $or user_id OR email. We should likely do the same or just user_id if we trust auth.
+      // Let's stick to user_id for now as email matching for updates is tricky without ensuring it's the right user.
+      await UserForm.updateMany(
+        { 
+          $or: [
+            { user_id: userId },
+            { email: req.user.email }
+          ],
+          isRead: false 
+        },
+        { isRead: true }
+      );
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking forms as read:", error);
+      res.status(500).json({ error: "Failed to mark as read" });
+    }
+  };
+
 module.exports = { 
   createUserForm, 
   getAllForms, 
@@ -440,5 +405,6 @@ module.exports = {
   getUserForms,
   respondToForm,
   downloadDocument,
-  getDashboardStats
+  getDashboardStats,
+  markAsRead
 };

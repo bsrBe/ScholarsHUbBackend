@@ -4,6 +4,7 @@ const ActivityLog = require("../models/activityLog");
 const path = require('path');
 const fs = require('fs');
 const sendEmail = require("../utils/sendEmail");
+const { toZonedTime, format } = require('date-fns-tz');
 
 const ACTIVE_MEETING_STATUSES = ["scheduled", "in-progress"];
 const WORKING_HOURS = {
@@ -32,35 +33,63 @@ const createMeeting = async (req, res) => {
             });
         }
 
-        const start = new Date(startTime);
-        const end = new Date(endTime);
-        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        const validStart = new Date(startTime);
+        const validEnd = new Date(endTime);
+
+        if (Number.isNaN(validStart.getTime()) || Number.isNaN(validEnd.getTime())) {
             return res.status(400).json({ error: "Invalid startTime or endTime." });
         }
 
         const now = new Date();
-        if (start <= now) {
+        if (validStart <= now) {
             return res.status(400).json({ error: "Meeting start time must be in the future." });
         }
 
-        if (end <= start) {
+        if (validEnd <= validStart) {
             return res.status(400).json({ error: "Meeting end time must be after the start time." });
         }
 
-        const dayStart = new Date(start);
-        dayStart.setHours(WORKING_HOURS.startHour, 0, 0, 0);
-        const dayEnd = new Date(start);
-        dayEnd.setHours(WORKING_HOURS.endHour, 0, 0, 0);
-
-        if (start < dayStart || end > dayEnd) {
+        // Get the time in the specified timezone
+        const zonedStart = toZonedTime(validStart, timeZone);
+        const zonedEnd = toZonedTime(validEnd, timeZone);
+        
+        const startHour = zonedStart.getHours();
+        const endHour = zonedEnd.getHours();
+        const endMinutes = zonedEnd.getMinutes();
+        
+        // Check if start time is before 8 AM
+        if (startHour < WORKING_HOURS.startHour) {
             return res.status(400).json({
-                error: "Consultations can only be scheduled between 8:00 AM and 12:00 AM.",
+                error: "Consultations can only be scheduled between 8:00 AM and 12:00 AM (Midnight).",
             });
         }
-
-        const startOfDay = new Date(start);
+        
+        // Special case for midnight (24:00 or 00:00 next day)
+        // If end time is exactly 00:00 of the next day, it's valid (12 AM)
+        const isMidnight = endHour === 0 && endMinutes === 0 && zonedEnd.getDate() !== zonedStart.getDate();
+        
+        // If not midnight, check if it goes past allowed hours (handled by < startHour check for next day or > 24 check)
+        // Actually, simple check: start hour must be >= 8. 
+        // We need to ensure the meeting doesn't span across restricted hours (e.g. 5AM)
+        // Since max duration is likely short, just checking start hour >= 8 and (end hour <= 24 or isMidnight) is good enough for "within range"
+        // But if end hour is e.g. 1 AM, that's invalid.
+        
+        // Allowed range: 08:00 to 24:00 (which is 00:00 next day).
+        // So startHour must be >= 8.
+        // And if end day > start day, end time must be 00:00.
+        
+        const isNextDay = zonedEnd.getDate() !== zonedStart.getDate();
+        if (isNextDay) {
+            if (!(zonedEnd.getHours() === 0 && zonedEnd.getMinutes() === 0)) {
+                 return res.status(400).json({
+                    error: "Consultations cannot extend past 12:00 AM (Midnight).",
+                });
+            }
+        } 
+        
+        const startOfDay = new Date(validStart);
         startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(start);
+        const endOfDay = new Date(validStart);
         endOfDay.setHours(23, 59, 59, 999);
 
         const existingSameDay = await Meeting.findOne({
@@ -75,8 +104,8 @@ const createMeeting = async (req, res) => {
             });
         }
 
-        const bufferStart = new Date(start.getTime() - BUFFER_MINUTES * 60 * 1000);
-        const bufferEnd = new Date(end.getTime() + BUFFER_MINUTES * 60 * 1000);
+        const bufferStart = new Date(validStart.getTime() - BUFFER_MINUTES * 60 * 1000);
+        const bufferEnd = new Date(validEnd.getTime() + BUFFER_MINUTES * 60 * 1000);
 
         const overlappingMeeting = await Meeting.findOne({
             status: { $in: ACTIVE_MEETING_STATUSES },
@@ -104,8 +133,8 @@ const createMeeting = async (req, res) => {
             hostName,
             hostEmail,
             participants,
-            startTime: start,
-            endTime: end,
+            startTime: validStart,
+            endTime: validEnd,
             timeZone,
             jitsiMeetingId,
             jitsiMeetingLink,
@@ -123,13 +152,13 @@ const createMeeting = async (req, res) => {
 
         // Send meeting confirmation emails in background
         const recipients = [hostEmail, ...participants.filter(p => p && p !== hostEmail)];
-        const meetingDate = start.toLocaleDateString('en-US', { 
+        const meetingDate = validStart.toLocaleDateString('en-US', { 
             weekday: 'long',
             year: 'numeric', 
             month: 'long', 
             day: 'numeric' 
         });
-        const meetingTime = start.toLocaleTimeString('en-US', { 
+        const meetingTime = validStart.toLocaleTimeString('en-US', { 
             hour: '2-digit', 
             minute: '2-digit',
             timeZone: timeZone 

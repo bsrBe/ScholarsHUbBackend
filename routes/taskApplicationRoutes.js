@@ -9,7 +9,8 @@ const {
   getAllTaskApplications,
   respondToTaskApplication,
   addMessage,
-  uploadAdditionalDocuments
+  uploadAdditionalDocuments,
+  markAsRead
 } = require("../controllers/taskApplicationController");
 
 // User routes
@@ -37,6 +38,7 @@ router.post(
 );
 
 router.get("/my-applications", protect, getUserTaskApplications);
+router.put("/mark-read", protect, markAsRead);
 router.get("/:id", protect, getTaskApplicationById);
 router.post("/:id/message", protect, addMessage);
 
@@ -52,7 +54,7 @@ router.put(
 
 // Admin routes
 router.get("/", protect, admin, getAllTaskApplications);
-router.put("/:id/respond", protect, admin, respondToTaskApplication);
+router.put("/:id/respond", protect, admin, upload.array('admin_response_documents', 10), respondToTaskApplication);
 
 module.exports = router;
 

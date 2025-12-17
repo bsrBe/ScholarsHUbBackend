@@ -11,6 +11,10 @@ const taskApplicationSchema = new mongoose.Schema({
     enum: ['undergraduate', 'masters', 'phd'],
     required: true
   },
+  destination: {
+    type: String,
+    required: false
+  },
   // Common documents for all types
   passport: {
     type: String, // Cloudinary URL
@@ -87,11 +91,18 @@ const taskApplicationSchema = new mongoose.Schema({
     enum: ['pending', 'in_review', 'approved', 'rejected'],
     default: 'pending'
   },
+  isRead: {
+    type: Boolean,
+    default: true
+  },
   admin_response: {
     type: String,
     required: false,
     trim: true
   },
+  admin_response_documents: [{
+    type: String // Cloudinary URLs
+  }],
   reviewed_at: {
     type: Date,
     required: false

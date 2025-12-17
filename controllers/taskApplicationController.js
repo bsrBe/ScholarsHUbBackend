@@ -107,6 +107,7 @@ const createTaskApplication = async (req, res) => {
     const taskApplication = new TaskApplication({
       user_id: userId,
       applicant_type,
+      destination: req.body.destination || null,
       ...uploadedFiles,
       status: 'pending'
     });
@@ -265,13 +266,32 @@ const respondToTaskApplication = async (req, res) => {
       return res.status(400).json({ error: "Invalid status" });
     }
 
+
+    // Process uploaded documents if any
+    let admin_response_documents = [];
+    if (req.files && req.files.length > 0) {
+      const { uploadToCloudinary } = require("../utils/cloudinary");
+      for (const file of req.files) {
+        try {
+          const result = await uploadToCloudinary(file.buffer, file.originalname);
+          admin_response_documents.push(result.secure_url);
+        } catch (uploadError) {
+          console.error("Error uploading admin document:", uploadError);
+          // Continue with other files or fail? Failing might be safer to let admin know
+          // But currently we'll log and continue to not block the whole response
+        }
+      }
+    }
+
     const application = await TaskApplication.findByIdAndUpdate(
       id,
       {
         admin_response: response,
         status,
+        isRead: false,
         reviewed_at: new Date(),
-        reviewed_by: adminId
+        reviewed_by: adminId,
+        $push: { admin_response_documents: { $each: admin_response_documents } }
       },
       { new: true }
     ).populate('user_id', 'name email');
@@ -484,6 +504,20 @@ const uploadAdditionalDocuments = async (req, res) => {
   }
 };
 
+const markAsRead = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    await TaskApplication.updateMany(
+      { user_id: userId, isRead: false },
+      { isRead: true }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error marking as read:", error);
+    res.status(500).json({ error: "Failed to mark as read" });
+  }
+};
+
 module.exports = {
   createTaskApplication,
   getUserTaskApplications,
@@ -491,6 +525,7 @@ module.exports = {
   getAllTaskApplications,
   respondToTaskApplication,
   addMessage,
-  uploadAdditionalDocuments
+  uploadAdditionalDocuments,
+  markAsRead
 };
 

@@ -599,4 +599,46 @@ const changePassword = async (req, res) => {
     }
 };
 
-module.exports = { register, Login, getMe, forgotPassword, resetPassword, confirmEmail, logout, changePassword };
+const updateDetails = async (req, res) => {
+    try {
+        const { name, email } = req.body;
+        const updates = {};
+        
+        if (name) updates.name = name;
+        
+        // Only allow email update if user is admin
+        if (email && req.user.role === 'admin') {
+            updates.email = email;
+        }
+
+        // Handle profile image upload
+        if (req.file) {
+            const { uploadToCloudinary } = require("../utils/cloudinary");
+            try {
+                const result = await uploadToCloudinary(req.file.buffer, req.file.originalname);
+                updates.profileImageUrl = result.secure_url;
+            } catch (uploadError) {
+                console.error("Error uploading profile image:", uploadError);
+                return res.status(500).json({ success: false, msg: "Failed to upload profile image" });
+            }
+        }
+
+        const user = await User.findByIdAndUpdate(req.user.id, updates, {
+            new: true,
+            runValidators: true
+        });
+
+        res.status(200).json({
+            success: true,
+            data: user
+        });
+    } catch (error) {
+        console.error("Update details error:", error);
+        res.status(500).json({
+            success: false,
+            msg: "Server error while updating profile"
+        });
+    }
+};
+
+module.exports = { register, Login, getMe, forgotPassword, resetPassword, confirmEmail, logout, changePassword, updateDetails };

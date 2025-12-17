@@ -13,8 +13,11 @@ const  {
     resetPassword,
     confirmEmail,
     logout,
-    changePassword
+    changePassword,
+    updateDetails
 } = require("../controllers/authController")
+
+const { upload } = require("../middlewares/multer");
 
 // Remove protect middleware to allow token verification
 router.get("/me", protect, getMe)
@@ -26,5 +29,7 @@ router.put("/resetPassword", resetPassword)
 router.get("/confirmEmail/:token", confirmEmail);
 router.post("/logout", logout)
 router.put("/changePassword", protect, changePassword)
+router.put("/updatedetails", protect, upload.single('profileImage'), updateDetails)
+
 module.exports = router
 
