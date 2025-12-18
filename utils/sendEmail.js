@@ -45,16 +45,16 @@ const nodemailer = require("nodemailer");
 const sendEmail = async (options) => {
     try {
       const transporter = nodemailer.createTransport({
-  host: "mail.scholarshubglobal.com",
-  port: 587,
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
   secure: false, // MUST be false for 587
   auth: {
     user: process.env.SMTP_EMAIL,
     pass: process.env.SMTP_PASSWORD,
   },
-  // tls: {
-  //   rejectUnauthorized: true,
-  // },
+  tls: {
+    rejectUnauthorized: false,
+  },
 });
 
         const message = {
