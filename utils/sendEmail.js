@@ -44,18 +44,24 @@ const nodemailer = require("nodemailer");
 
 const sendEmail = async (options) => {
     try {
-      const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false, // MUST be false for 587
-  auth: {
-    user: process.env.SMTP_EMAIL,
-    pass: process.env.SMTP_PASSWORD,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
+        const port = Number(process.env.SMTP_PORT) || 587;
+        
+        console.log(`[Email] Attempting to send email to: ${options.email}`);
+        console.log(`[Email] Using Host: ${process.env.SMTP_HOST}, Port: ${port}, Secure: ${port === 465}`);
+
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: port,
+            secure: port === 465,
+            auth: {
+                user: process.env.SMTP_EMAIL,
+                pass: process.env.SMTP_PASSWORD,
+            },
+            tls: {
+                rejectUnauthorized: false,
+            },
+            connectionTimeout: 40000, // 40 seconds
+        });
 
         const message = {
             from: `${process.env.FROM_NAME} <${process.env.SMTP_EMAIL}>`,
@@ -66,9 +72,13 @@ const sendEmail = async (options) => {
         };
 
         const info = await transporter.sendMail(message);
-        console.log("Message sent: %s", info.messageId);
+        console.log(`✅ [Email] Success! Message ID: ${info.messageId}`);
+        return info;
     } catch (error) {
-        console.error("Error sending email:", error.message);
+        console.error("❌ [Email] Failed to send email.");
+        console.error(`[Email] Error Message: ${error.message}`);
+        console.error(`[Email] Error Code: ${error.code}`);
+        console.error(`[Email] Full Error:`, error);
         throw error;
     }
 };
