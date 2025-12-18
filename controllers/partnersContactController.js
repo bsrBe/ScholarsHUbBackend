@@ -1,37 +1,8 @@
-const nodemailer = require('nodemailer');
-const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const PartnershipRequest = require('../models/partnershipRequest');
 const { uploadToCloudinary } = require("../utils/cloudinary");
-
-// Configure multer for memory storage
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  },
-  fileFilter: function (req, file, cb) {
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, PDF, DOC, DOCX, and TXT files are allowed.'));
-    }
-  }
-});
-
-// Create a transporter for sending emails
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const { upload } = require("../middlewares/multer");
+const sendEmail = require("../utils/sendEmail");
 
 // Submit partners contact form
 const submitPartnerInquiry = async (req, res) => {
@@ -184,7 +155,7 @@ const submitPartnerInquiry = async (req, res) => {
               Feel free to contact our partnership team directly at:
             </p>
             <ul style="color: #495057; line-height: 1.8;">
-              <li><strong>Email:</strong> <a href="mailto:partners@scholarshub.com" style="color: #667eea;">partners@scholarshub.com</a></li>
+              <li><strong>Email:</strong> <a href="mailto:partners@scholarshubglobal.com" style="color: #667eea;">partners@scholarshubglobal.com</a></li>
               <li><strong>Phone:</strong> +1 (234) 567-890</li>
             </ul>
           </div>
@@ -211,17 +182,15 @@ const submitPartnerInquiry = async (req, res) => {
     `;
 
     // Send email to partners team
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: 'partners@scholarshub.com',
+    await sendEmail({
+      email: 'partners@scholarshubglobal.com',
       subject: `New Partnership Inquiry: ${organizationName}`,
       html: partnerEmailContent,
     });
 
     // Send confirmation email to the partner
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
+    await sendEmail({
+      email: email,
       subject: 'Partnership Inquiry Received - ScholarsHub',
       html: confirmationEmailContent,
     });
@@ -268,7 +237,6 @@ const submitIndividualInquiry = async (req, res) => {
         const file = req.files.passport[0];
         const timestamp = Date.now();
         const random = Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
         const filename = `partner-${timestamp}-${random}`;
         
         try {
@@ -294,7 +262,6 @@ const submitIndividualInquiry = async (req, res) => {
         const file = req.files.resume[0];
         const timestamp = Date.now();
         const random = Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
         const filename = `partner-${timestamp}-${random}`;
         
         try {
@@ -337,8 +304,7 @@ const submitIndividualInquiry = async (req, res) => {
     
     // Create email content
     const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER,
+      email: process.env.SMTP_EMAIL,
       subject: `New Individual Partnership Inquiry - ${fullName}`,
       html: `
         <h2>Individual Partnership Inquiry</h2>
@@ -363,7 +329,7 @@ const submitIndividualInquiry = async (req, res) => {
     
     // Send email (optional - don't fail if email fails)
     try {
-      await transporter.sendMail(mailOptions);
+      await sendEmail(mailOptions);
     } catch (emailError) {
       console.error('Failed to send email:', emailError);
       // Continue with success response even if email fails
@@ -406,7 +372,6 @@ const submitCompanyInquiry = async (req, res) => {
         const file = req.files.businessLicense[0];
         const timestamp = Date.now();
         const random = Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
         const filename = `partner-${timestamp}-${random}`;
         
         try {
@@ -432,7 +397,6 @@ const submitCompanyInquiry = async (req, res) => {
         const file = req.files.companyProfile[0];
         const timestamp = Date.now();
         const random = Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
         const filename = `partner-${timestamp}-${random}`;
         
         try {
@@ -474,8 +438,7 @@ const submitCompanyInquiry = async (req, res) => {
     
     // Create email content
     const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER,
+      email: process.env.SMTP_EMAIL,
       subject: `New Company Partnership Inquiry - ${organizationName}`,
       html: `
         <h2>Company Partnership Inquiry</h2>
@@ -502,7 +465,7 @@ const submitCompanyInquiry = async (req, res) => {
     
     // Send email (optional - don't fail if email fails)
     try {
-      await transporter.sendMail(mailOptions);
+      await sendEmail(mailOptions);
     } catch (emailError) {
       console.error('Failed to send email:', emailError);
       // Continue with success response even if email fails

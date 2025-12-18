@@ -25,8 +25,9 @@ const { setupHealthEndpoint, scheduleKeepAlive } = require('./cron-keep-alive');
 
 const allowedOrigins = [
  "https://scholarshubglobal.com",
-  "https://meet.jit.si",
-  "https://*.jit.si",
+ "http://localhost:8080",
+ "https://meet.jit.si",
+ "https://*.jit.si",
 ];
 
 // CORS configuration
@@ -75,6 +76,9 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 
+// Set up health check endpoint (must be before routes/middleware that might mask it)
+setupHealthEndpoint(app);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/forms", userFormRoutes);
 app.use("/api/partners-contact", partnersContactRoutes);
@@ -122,9 +126,6 @@ const startServer = async () => {
       // Close server & exit process
       server.close(() => process.exit(1));
     });
-
-    // Set up health check endpoint
-    setupHealthEndpoint(app);
   } catch (error) {
     console.error('Error starting server:', error);
     process.exit(1);
