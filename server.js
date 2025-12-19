@@ -25,6 +25,7 @@ const { setupHealthEndpoint, scheduleKeepAlive } = require('./cron-keep-alive');
 
 const allowedOrigins = [
  "https://scholarshubglobal.com",
+ "scholarshubglobal.com",
  "http://localhost:8080",
  "https://meet.jit.si",
  "https://*.jit.si",
