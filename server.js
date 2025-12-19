@@ -24,11 +24,14 @@ const chatRoutes = require('./routes/chatRoutes');
 const { setupHealthEndpoint, scheduleKeepAlive } = require('./cron-keep-alive');
 
 const allowedOrigins = [
- "https://scholarshubglobal.com",
- "scholarshubglobal.com",
- "http://localhost:8080",
- "https://meet.jit.si",
- "https://*.jit.si",
+  "https://scholarshubglobal.com",
+  "http://scholarshubglobal.com",
+  "https://www.scholarshubglobal.com",
+  "http://www.scholarshubglobal.com",
+  "scholarshubglobal.com",
+  "http://localhost:8080",
+  "https://meet.jit.si",
+  "https://*.jit.si",
 ];
 
 // CORS configuration
