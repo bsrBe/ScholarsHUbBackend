@@ -7,7 +7,7 @@ const uploadToCloudinary = (fileBuffer, filename, options = {}) => {
     
     const uploadOptions = {
       folder: options.folder || (isImage ? "thumbnails" : "documents"),
-      public_id: filename.replace(/\.[^/.]+$/, ""), // strip extension
+      public_id: filename.replace(/\.[^/.]+$/, "").trim(), // strip extension and trim whitespace
       resource_type: isImage ? "image" : "raw",
       use_filename: true,
       unique_filename: false,
