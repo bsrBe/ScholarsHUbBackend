@@ -95,6 +95,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/testimonials", testimonialRoutes);
 app.use("/api/task-applications", taskApplicationRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/duolingo", require("./routes/duolingoRoutes"));
 app.use("/api/contact", require("./routes/contactRoutes"));
 
 // Error handler middleware (must be after all other middleware and routes)
