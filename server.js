@@ -61,12 +61,28 @@ const snapshotBotCheck = (req, res, next) => {
   const ua = req.headers['user-agent'];
   
   if (origin && origin.startsWith('http://localhost:')) {
-    if (ua && !ua.includes("ScholarsHubSnapshotBot/1.0")) {
-      return res.status(403).json({
-        success: false,
-        message: 'CORS policy: Unauthorized localhost access attempt.'
-      });
+    // Allow the Snapshot Bot
+    if (ua && ua.includes("ScholarsHubSnapshotBot/1.0")) {
+      return next();
     }
+    
+    // Allow standard browsers for local development
+    const isBrowser = ua && (
+      ua.includes("Mozilla") || 
+      ua.includes("Chrome") || 
+      ua.includes("Safari") || 
+      ua.includes("Edge")
+    );
+    
+    if (isBrowser) {
+      return next();
+    }
+
+    // Block other unauthorized automated attempts on localhost
+    return res.status(403).json({
+      success: false,
+      message: 'CORS policy: Unauthorized localhost access attempt.'
+    });
   }
   next();
 };
