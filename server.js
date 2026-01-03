@@ -40,21 +40,40 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
+    // Check if origin is in allowedOrigins
+    const isAllowed = allowedOrigins.indexOf(origin) !== -1;
+    if (isAllowed) return callback(null, true);
+
+    // If not in allowedOrigins, check if it's a localhost origin trying to bypass via snapshot bot
+    const isLocalhost = origin.startsWith('http://localhost:');
+    return callback(null, isLocalhost); // We will check the UA in a custom middleware to reject if not bot
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'User-Agent'],
   exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
   maxAge: 86400 // 24 hours
 };
 
-// Apply CORS middleware
+// Custom CORS check middleware for Snapshot Bot
+const snapshotBotCheck = (req, res, next) => {
+  const origin = req.headers.origin;
+  const ua = req.headers['user-agent'];
+  
+  if (origin && origin.startsWith('http://localhost:')) {
+    if (ua !== "ScholarsHubSnapshotBot/1.0") {
+      return res.status(403).json({
+        success: false,
+        message: 'CORS policy: Unauthorized localhost access attempt.'
+      });
+    }
+  }
+  next();
+};
+
+// Apply middlewares
 app.use(cors(corsOptions));
+app.use(snapshotBotCheck);
 
 // Enable pre-flight across the board
 app.options('*', cors(corsOptions));
