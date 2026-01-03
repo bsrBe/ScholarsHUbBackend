@@ -61,7 +61,7 @@ const snapshotBotCheck = (req, res, next) => {
   const ua = req.headers['user-agent'];
   
   if (origin && origin.startsWith('http://localhost:')) {
-    if (ua !== "ScholarsHubSnapshotBot/1.0") {
+    if (ua && !ua.includes("ScholarsHubSnapshotBot/1.0")) {
       return res.status(403).json({
         success: false,
         message: 'CORS policy: Unauthorized localhost access attempt.'
